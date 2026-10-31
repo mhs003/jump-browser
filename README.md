@@ -111,5 +111,5 @@ extension points, not hidden behavior.
 
 ## License
 
-This project is provided for personal and educational use. The name "Jump", the
-Jump mark, and all source code in this repository are original to this project.
+MIT. See [LICENSE](LICENSE). The name "Jump", the Jump mark, and all source
+code in this repository are original to this project.
