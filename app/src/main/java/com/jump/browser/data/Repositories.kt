@@ -34,8 +34,8 @@ class SettingsRepository(private val context: Context) {
                 searchEngineId = o.optString("searchEngineId", defaults.searchEngineId),
                 customSearchUrl = o.optString("customSearchUrl", defaults.customSearchUrl),
                 homepageUrl = o.optString("homepageUrl", defaults.homepageUrl),
-                darkMode = runCatching { DarkMode.valueOf(o.optString("darkMode", "SYSTEM")) }
-                    .getOrDefault(DarkMode.SYSTEM),
+                darkMode = runCatching { DarkMode.valueOf(o.optString("darkMode", "LIGHT")) }
+                    .getOrDefault(DarkMode.LIGHT),
                 adBlock = o.optBoolean("adBlock", defaults.adBlock),
                 blockThirdPartyCookies = o.optBoolean("blockThirdPartyCookies", defaults.blockThirdPartyCookies),
                 javaScript = o.optBoolean("javaScript", defaults.javaScript),
@@ -47,6 +47,7 @@ class SettingsRepository(private val context: Context) {
                 readerMode = o.optBoolean("readerMode", defaults.readerMode),
                 textZoom = o.optInt("textZoom", defaults.textZoom),
                 incognitoDefault = o.optBoolean("incognitoDefault", defaults.incognitoDefault),
+                confirmExit = o.optBoolean("confirmExit", defaults.confirmExit),
             )
         }.getOrDefault(defaults)
     }
@@ -74,6 +75,7 @@ class SettingsRepository(private val context: Context) {
             .put("readerMode", s.readerMode)
             .put("textZoom", s.textZoom)
             .put("incognitoDefault", s.incognitoDefault)
+            .put("confirmExit", s.confirmExit)
         prefs.edit().putString("settings_json", o.toString()).apply()
     }
 }
@@ -87,10 +89,10 @@ class BookmarkRepository(
     var bookmarks by mutableStateOf(Bookmark.listFromJson(prefs.getString("bookmarks", "[]")))
         private set
 
-    fun add(title: String, url: String, folder: String = "") {
+    fun add(title: String, url: String, folder: String = "", iconPath: String = "") {
         if (url.isBlank()) return
         if (bookmarks.any { it.url == url }) return
-        val item = Bookmark(idGen.incrementAndGet(), title.ifBlank { url }, url, folder = folder)
+        val item = Bookmark(idGen.incrementAndGet(), title.ifBlank { url }, url, folder = folder, iconPath = iconPath)
         bookmarks = bookmarks + item
         persist()
     }
@@ -110,9 +112,9 @@ class BookmarkRepository(
         persist()
     }
 
-    fun toggle(title: String, url: String) {
+    fun toggle(title: String, url: String, iconPath: String = "") {
         val existing = bookmarks.firstOrNull { it.url == url }
-        if (existing != null) remove(existing.id) else add(title, url)
+        if (existing != null) remove(existing.id) else add(title, url, iconPath = iconPath)
     }
 
     fun isBookmarked(url: String) = bookmarks.any { it.url == url }
@@ -283,7 +285,10 @@ class DownloadRepository(
         suggestedName: String? = null,
     ): Long? {
         if (!url.startsWith("http")) return null
-        val name = suggestedName ?: contentDisposition?.let { guessName(it) } ?: guessName(url)
+        val dispositionName = contentDisposition
+            ?.takeIf { it.contains("filename", ignoreCase = true) }
+            ?.let { guessName(it) }
+        val name = suggestedName ?: dispositionName ?: guessName(url)
         val safeName = sanitiseName(name)
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle(safeName)
@@ -330,7 +335,10 @@ class DownloadRepository(
                     val status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                     val bytes = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
                     val total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-                    val uri = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                    val localUri = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                    val uri = if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        runCatching { manager.getUriForDownloadedFile(id)?.toString() }.getOrNull() ?: localUri
+                    } else localUri
                     val mime = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_MEDIA_TYPE))
                     out += DownloadTask(
                         id = id,

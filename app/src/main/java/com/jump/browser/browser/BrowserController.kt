@@ -85,7 +85,12 @@ class BrowserController(
     private val app: AppContainer,
     private val launchFileChooser: (Intent) -> Unit,
 ) {
-    private class Session(var info: TabInfo, var webView: WebView? = null)
+    private class Session(
+        var info: TabInfo,
+        var webView: WebView? = null,
+        var loadRequested: Boolean = false,
+        var homeInHistory: Boolean = false,
+    )
 
     private val sessions = LinkedHashMap<Long, Session>()
     private val ids = AtomicLong(1)
@@ -162,8 +167,7 @@ class BrowserController(
         if (select) activeId = id
         publish()
         if (select) {
-            syncHost()
-            if (target != null) loadInSession(id, target)
+            if (target != null) loadInSession(id, target) else syncHost()
             saveState()
         }
         return id
@@ -252,8 +256,11 @@ class BrowserController(
         attached = desired
         if (desired != null) {
             (desired.parent as? ViewGroup)?.removeView(desired)
-            if (desired.url == null) {
-                active?.info?.url?.let(desired::loadUrl)
+            if (active != null && !active.loadRequested) {
+                active.info.url?.let {
+                    active.loadRequested = true
+                    desired.loadUrl(it)
+                }
             }
             frame.addView(
                 desired,
@@ -310,18 +317,22 @@ class BrowserController(
     private fun loadInSession(id: Long, rawUrl: String) {
         val s = sessions[id] ?: return
         val url = UrlUtils.toUrlOrSearch(rawUrl, app.settings.settings.searchEngine) ?: return
+        contextMenu = null
+        if (s.info.isHome) s.homeInHistory = true
         s.info = s.info.copy(
             url = url,
             loading = true,
             progress = 0,
             errorCode = null,
             errorText = null,
-            title = if (s.info.title.isBlank() || s.info.title == "Homepage") UrlUtils.titleFor(url) else s.info.title,
+            favicon = null,
+            title = UrlUtils.titleFor(url),
         )
         publish()
         val w = s.webView ?: createWebView(id)
-        if (activeId == id) syncHost()
+        s.loadRequested = true
         w.loadUrl(url)
+        if (activeId == id) syncHost()
         saveState()
     }
 
@@ -333,6 +344,7 @@ class BrowserController(
             loadInSession(id, home)
             return
         }
+        s.homeInHistory = false
         s.info = s.info.copy(
             url = null,
             title = "Homepage",
@@ -349,8 +361,14 @@ class BrowserController(
     }
 
     fun goBack() {
-        val w = activeWebView() ?: return
-        if (w.canGoBack()) w.goBack()
+        val id = activeId ?: return
+        val s = sessions[id] ?: return
+        val w = s.webView
+        if (w != null && w.canGoBack()) {
+            w.goBack()
+        } else if (s.homeInHistory) {
+            goHome()
+        }
     }
 
     fun goForward() {
@@ -389,6 +407,19 @@ class BrowserController(
         notify("Link copied to clipboard")
     }
 
+    fun downloadUrl(url: String, mime: String? = null) {
+        if (!url.startsWith("http")) {
+            notify("This link cannot be downloaded")
+            return
+        }
+        app.downloads.enqueue(url, null, null, mime)
+        notify("Download started")
+    }
+
+    fun dismissContextMenu() {
+        contextMenu = null
+    }
+
     fun openExternal(url: String) {
         runCatching {
             activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -421,10 +452,23 @@ class BrowserController(
         val tab = activeTab ?: return false
         val url = tab.url ?: return false
         val exists = app.bookmarks.isBookmarked(url)
-        app.bookmarks.toggle(tab.title, url)
+        val iconPath = if (exists) "" else saveBookmarkIcon(url, tab.favicon)
+        app.bookmarks.toggle(tab.title, url, iconPath)
         notify(if (exists) "Bookmark removed" else "Bookmark added")
         return !exists
     }
+
+    private fun saveBookmarkIcon(url: String, bitmap: android.graphics.Bitmap?): String {
+        if (bitmap == null || bitmap.isRecycled) return ""
+        return runCatching {
+            val dir = java.io.File(app.filesDir, "bookmark_icons").apply { mkdirs() }
+            val file = java.io.File(dir, "${url.hashCode()}.png")
+            file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            file.absolutePath
+        }.getOrDefault("")
+    }
+
+    fun saveTabIcon(url: String, bitmap: android.graphics.Bitmap?) = saveBookmarkIcon(url, bitmap)
 
     fun setAdBlock(enabled: Boolean) {
         app.settings.update { it.copy(adBlock = enabled) }
@@ -505,7 +549,6 @@ class BrowserController(
         val s = sessions[id] ?: error("missing session")
         val w = WebView(activity)
         val settings = app.settings.settings
-        val prefs = settings
         val baseUa = defaultUserAgent()
         s.webView = w
         w.layoutParams = FrameLayout.LayoutParams(
@@ -522,7 +565,7 @@ class BrowserController(
             useWideViewPort = true
             builtInZoomControls = true
             displayZoomControls = false
-            supportZoom = true
+            setSupportZoom(true)
             mediaPlaybackRequiresUserGesture = true
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
@@ -656,6 +699,7 @@ class BrowserController(
                     errorText = null,
                     secure = UrlUtils.isSecure(url),
                     favicon = favicon ?: it.favicon,
+                    canGoBack = sessions[id]?.homeInHistory == true || view?.canGoBack() == true,
                 )
             }
         }
@@ -670,9 +714,16 @@ class BrowserController(
                     title = if (!title.isNullOrBlank()) title else it.title,
                     loading = false,
                     progress = 100,
-                    canGoBack = view.canGoBack(),
+                    canGoBack = sessions[id]?.homeInHistory == true || view?.canGoBack() == true,
                     canGoForward = view.canGoForward(),
                     secure = UrlUtils.isSecure(url),
+                )
+            }
+            if (app.settings.settings.doNotTrack) {
+                view.evaluateJavascript(
+                    "Object.defineProperty(navigator,'doNotTrack',{get:function(){return '1';},configurable:true});" +
+                        "Object.defineProperty(navigator,'globalPrivacyControl',{get:function(){return true;},configurable:true});",
+                    null,
                 )
             }
             if (app.settings.settings.adBlock) {
@@ -682,7 +733,7 @@ class BrowserController(
                     null,
                 )
             }
-            if (!sessions[id]?.info?.incognito.orFalse()) {
+            if (sessions[id]?.info?.incognito != true) {
                 app.history.record(view.title ?: "", url)
             }
             saveState()
@@ -694,15 +745,11 @@ class BrowserController(
             update(id) {
                 it.copy(
                     url = url,
-                    canGoBack = view.canGoBack(),
+                    canGoBack = sessions[id]?.homeInHistory == true || view?.canGoBack() == true,
                     canGoForward = view.canGoForward(),
                     secure = UrlUtils.isSecure(url),
                 )
             }
-        }
-
-        override fun onReceivedIcon(view: WebView?, icon: android.graphics.Bitmap?) {
-            if (icon != null) update(id) { it.copy(favicon = icon) }
         }
 
         override fun onReceivedError(
@@ -824,9 +871,9 @@ class BrowserController(
             url: String?,
             message: String?,
             defaultValue: String?,
-            result: JsResult?,
+            result: android.webkit.JsPromptResult?,
         ): Boolean {
-            if (result is android.webkit.JsPromptResult) {
+            if (result != null) {
                 val input = EditText(activity).apply {
                     setText(defaultValue ?: "")
                     setSelection(text.length)
@@ -950,15 +997,30 @@ class BrowserController(
         val js = """
             (function(){
               try {
-                var nodes = document.querySelectorAll('article, main, [role="main"], .post, .article, .entry-content, #content, .markdown-body');
+                var nodes = document.querySelectorAll('article, main, [role="main"], #mw-content-text, .post, .article, .entry-content, #content, .markdown-body, .article-body, .story-body');
                 var best = document.body;
                 var bestScore = 0;
                 for (var i=0;i<nodes.length;i++) {
-                  var t = nodes[i].innerText || '';
-                  var score = t.length + (nodes[i].querySelectorAll('p').length * 250);
+                  var ps = nodes[i].querySelectorAll('p');
+                  var t = '';
+                  for (var j=0;j<ps.length;j++) t += (ps[j].innerText || '') + '\n\n';
+                  var score = t.length + (ps.length * 120);
                   if (score > bestScore) { bestScore = score; best = nodes[i]; }
                 }
-                var text = (best.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+                if (bestScore < 200) best = document.body;
+                var junk = best.querySelectorAll('.navbox, .infobox, .reference, .references, .mw-editsection, .sidebar, .catlinks, table, script, style, noscript');
+                for (var k=0;k<junk.length;k++) { junk[k].style.display = 'none'; }
+                var parts = best.querySelectorAll('h1, h2, h3, p, li, blockquote, pre');
+                var out = [];
+                for (var m=0;m<parts.length;m++) {
+                  var s = (parts[m].innerText || '').trim();
+                  if (!s) continue;
+                  if (s.length < 2) continue;
+                  if (/^(edit|\[edit\])$/i.test(s)) continue;
+                  out.push(s);
+                }
+                var text = out.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+                if (text.length > 120000) text = text.substring(0, 120000);
                 var title = document.title || '';
                 var byline = '';
                 var meta = document.querySelector('meta[name="author"]');
@@ -1015,7 +1077,7 @@ class BrowserController(
         val dir = java.io.File(activity.filesDir, "saved_pages").apply { mkdirs() }
         val name = (w.title ?: "page").replace(Regex("[^A-Za-z0-9._-]"), "_").take(48)
         val file = java.io.File(dir, "$name.${if (type == "webarchive") "mht" else "html"}")
-        w.saveWebArchive(file.absolutePath) { path ->
+        w.saveWebArchive(file.absolutePath, false) { path ->
             if (path != null) notify("Saved to ${file.name}") else notify("Could not save page")
         }
     }

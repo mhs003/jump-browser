@@ -9,6 +9,7 @@ data class Bookmark(
     val url: String,
     val createdAt: Long = System.currentTimeMillis(),
     val folder: String = "",
+    val iconPath: String = "",
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -16,6 +17,7 @@ data class Bookmark(
         .put("url", url)
         .put("createdAt", createdAt)
         .put("folder", folder)
+        .put("iconPath", iconPath)
 
     companion object {
         fun fromJson(o: JSONObject) = Bookmark(
@@ -24,6 +26,7 @@ data class Bookmark(
             url = o.optString("url"),
             createdAt = o.optLong("createdAt"),
             folder = o.optString("folder"),
+            iconPath = o.optString("iconPath"),
         )
 
         fun listToJson(items: List<Bookmark>): String =
@@ -135,7 +138,7 @@ data class AppSettings(
     val searchEngineId: String = "google",
     val customSearchUrl: String = "",
     val homepageUrl: String = "",
-    val darkMode: DarkMode = DarkMode.SYSTEM,
+    val darkMode: DarkMode = DarkMode.LIGHT,
     val adBlock: Boolean = true,
     val blockThirdPartyCookies: Boolean = false,
     val javaScript: Boolean = true,
@@ -147,6 +150,7 @@ data class AppSettings(
     val readerMode: Boolean = false,
     val textZoom: Int = 100,
     val incognitoDefault: Boolean = false,
+    val confirmExit: Boolean = true,
 ) {
     val searchEngine: SearchEngine
         get() {
