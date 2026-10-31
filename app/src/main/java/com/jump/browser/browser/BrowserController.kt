@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.webkit.WebSettingsCompat
 import com.jump.browser.data.AppContainer
 import com.jump.browser.data.TabSnapshot
 import com.jump.browser.data.TabStore
@@ -345,6 +346,7 @@ class BrowserController(
             return
         }
         s.homeInHistory = false
+        s.webView?.clearHistory()
         s.info = s.info.copy(
             url = null,
             title = "Homepage",
@@ -520,24 +522,29 @@ class BrowserController(
     }
 
     private fun applyDarkMode(w: WebView) {
+        runCatching {
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(w.settings, false)
+            WebSettingsCompat.setForceDark(w.settings, WebSettingsCompat.FORCE_DARK_OFF)
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             @Suppress("DEPRECATION")
-            w.settings.forceDark = if (isDarkTheme) WebSettings.FORCE_DARK_ON else WebSettings.FORCE_DARK_OFF
-        } else {
-            val css = if (isDarkTheme) {
-                "html{filter:invert(1) hue-rotate(180deg);background:#111!important}img,video,picture,canvas,svg{filter:invert(1) hue-rotate(180deg)!important}"
-            } else ""
-            w.evaluateJavascript(
-                "(function(){var s=document.getElementById('via-dark-css');" +
-                    "if(!s){s=document.createElement('style');s.id='via-dark-css';document.head&&document.head.appendChild(s);}" +
-                    "s.textContent=${JSONObject.quote(css)};})()",
-                null,
-            )
+            w.settings.forceDark = WebSettings.FORCE_DARK_OFF
         }
+        val darkCss = "html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important;}" +
+            "img,video,picture,canvas,svg,iframe{filter:invert(1) hue-rotate(180deg)!important;}"
+        val js = if (isDarkTheme) {
+            "(function(){var s=document.getElementById('jump-night-css');" +
+                "if(!s){s=document.createElement('style');s.id='jump-night-css';(document.head||document.documentElement).appendChild(s);}" +
+                "s.textContent=${JSONObject.quote(darkCss)};})()"
+        } else {
+            "(function(){var s=document.getElementById('jump-night-css');if(s)s.remove();})()"
+        }
+        w.evaluateJavascript(js, null)
     }
 
     var isDarkTheme: Boolean = false
         set(value) {
+            if (field == value) return
             field = value
             applyDarkModeToAll()
         }
@@ -719,6 +726,7 @@ class BrowserController(
                     secure = UrlUtils.isSecure(url),
                 )
             }
+            applyDarkMode(view)
             if (app.settings.settings.doNotTrack) {
                 view.evaluateJavascript(
                     "Object.defineProperty(navigator,'doNotTrack',{get:function(){return '1';},configurable:true});" +
@@ -948,9 +956,16 @@ class BrowserController(
     fun hasFullscreen(): Boolean = fullscreenView != null
 
     fun exitFullscreen() {
-        if (fullscreenView != null) {
-            fullscreenView = null
+        val view = fullscreenView ?: return
+        (activity.window.decorView as? FrameLayout)?.removeView(view)
+        fullscreenView = null
+        runCatching { fullscreenCallback?.onCustomViewHidden() }
+        fullscreenCallback = null
+        if (Build.VERSION.SDK_INT >= 30) {
             activity.window.insetsController?.show(WindowInsets.Type.systemBars())
+        } else {
+            @Suppress("DEPRECATION")
+            activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
         }
     }
 

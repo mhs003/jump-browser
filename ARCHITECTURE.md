@@ -155,6 +155,14 @@ fades. Page indicator and menu paging use the horizontal pager's own spring.
 - **Real incognito isolation** — use AndroidX WebKit profiles on providers that
   support them; keep the existing tab flag for history suppression.
 
+## Release packaging
+
+Release builds enable R8 minification and resource shrinking. The signing
+config intentionally reuses the local debug key so the APK can be sideloaded
+for testing; replace it with a private release key before distribution. The
+minified build is approximately 2.2 MB including CameraX, ZXing and AndroidX
+WebKit.
+
 ## Testing
 
 JVM tests cover URL normalization, search routing, and JSON codecs. Instrumented

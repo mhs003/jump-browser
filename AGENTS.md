@@ -79,3 +79,9 @@ app/src/main/java/com/jump/browser/
 - When changing the chrome, verify the homepage, a loaded page, the address bar,
   the tab popup, and the menu sheet.
 - Keep commits coherent and descriptive.
+- Release builds are minified, resource-shrunk and signed with the local debug
+  key for sideloading: `tad build release`.
+- Keep `dist/Jump-1.0.0.apk` and `dist/SHA256SUMS.txt` in sync with the release
+  build when producing a user-facing artifact.
+- Screenshots live in `docs/screenshots/`; README references only files inside
+  this repository.

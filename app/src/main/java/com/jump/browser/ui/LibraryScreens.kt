@@ -237,8 +237,8 @@ fun BookmarkEditDialog(
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
 ) {
-    var title by remember { mutableStateOf(initial?.title ?: "") }
-    var url by remember { mutableStateOf(initial?.url ?: "") }
+    var title by remember(initial?.id) { mutableStateOf(initial?.title ?: "") }
+    var url by remember(initial?.id) { mutableStateOf(initial?.url ?: "") }
     JumpAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Add bookmark" else "Edit bookmark") },
@@ -466,6 +466,7 @@ fun SettingsScreen(
 ) {
     var dialog by remember { mutableStateOf<String?>(null) }
     var homepageDraft by remember { mutableStateOf(settings.homepageUrl) }
+    var customSearchDraft by remember { mutableStateOf(settings.customSearchUrl) }
     ScreenScaffold(title = "Settings", onBack = onBack) {
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
             item { SectionHeader("General") }
@@ -474,6 +475,14 @@ fun SettingsScreen(
                     "Search engine",
                     settings.searchEngine.name,
                 ) { dialog = "engine" }
+            }
+            if (settings.searchEngineId == "custom") {
+                item {
+                    SettingsRow(
+                        "Custom search URL",
+                        settings.customSearchUrl.ifBlank { "Not set" },
+                    ) { customSearchDraft = settings.customSearchUrl; dialog = "customSearch" }
+                }
             }
             item {
                 SettingsRow(
@@ -542,6 +551,11 @@ fun SettingsScreen(
                     onSettingsChange { s -> s.copy(restoreTabs = it) }
                 }
             }
+            item {
+                SettingsSwitchRow("Confirm before exiting", "Show the exit confirmation dialog", settings.confirmExit) {
+                    onSettingsChange { s -> s.copy(confirmExit = it) }
+                }
+            }
             item { SectionHeader("About") }
             item { SettingsRow("About Jump", "Version 1.0.0") { onAbout() } }
             item { Spacer(Modifier.height(28.dp)) }
@@ -556,7 +570,10 @@ fun SettingsScreen(
             onDismiss = { dialog = null },
             onSelect = { id ->
                 onSettingsChange { it.copy(searchEngineId = id) }
-                dialog = null
+                if (id == "custom") {
+                    customSearchDraft = settings.customSearchUrl.ifBlank { "https://www.google.com/search?q=%s" }
+                    dialog = "customSearch"
+                } else dialog = null
             },
         )
     }
@@ -582,6 +599,35 @@ fun SettingsScreen(
                 onSettingsChange { it.copy(textZoom = value.toInt()) }
                 dialog = null
             },
+        )
+    }
+    if (dialog == "customSearch") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Custom search URL") },
+            text = {
+                Column {
+                    Text("Use %s where the search query should go.", fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    TextField(
+                        value = customSearchDraft,
+                        onValueChange = { customSearchDraft = it },
+                        singleLine = true,
+                        placeholder = { Text("https://example.com/search?q=%s") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    var template = customSearchDraft.trim()
+                    if (template.isNotEmpty() && !template.contains("%s")) {
+                        template += (if (template.contains("?")) "&q=%s" else "?q=%s")
+                    }
+                    onSettingsChange { it.copy(customSearchUrl = template, searchEngineId = "custom") }
+                    dialog = null
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "homepage") {

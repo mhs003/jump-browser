@@ -168,6 +168,7 @@ fun BrowserRoot(
 
     BackHandler {
         when {
+            controller.hasFullscreen() -> controller.exitFullscreen()
             exitDialog -> exitDialog = false
             qrScreen -> qrScreen = false
             aboutDialog -> aboutDialog = false
@@ -378,6 +379,7 @@ fun BrowserRoot(
                     MenuAction.RELOAD -> controller.reload()
                     MenuAction.HOME -> controller.goHome()
                     MenuAction.HELP -> helpDialog = true
+                    MenuAction.ABOUT -> aboutDialog = true
                     MenuAction.EXIT -> exitApp()
                 }
             },
@@ -882,7 +884,7 @@ private fun addShortcut(context: Context, title: String, url: String?) {
         val shortcut = ShortcutInfo.Builder(context, "jump-" + url.hashCode())
             .setShortLabel(title.take(12).ifBlank { "Jump" })
             .setLongLabel(title.take(30).ifBlank { "Open in Jump" })
-            .setIcon(Icon.createWithResource(context, android.R.drawable.ic_menu_search))
+            .setIcon(Icon.createWithResource(context, com.jump.browser.R.drawable.ic_jump))
             .setIntent(
                 Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     .setClassName(context.packageName, MainActivity::class.java.name)

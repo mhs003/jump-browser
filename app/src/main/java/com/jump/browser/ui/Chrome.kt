@@ -49,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,13 +69,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
 
 enum class MenuAction {
     NEW_TAB, NEW_INCOGNITO_TAB, BOOKMARKS, HISTORY, DOWNLOADS, SHARE, ADD_BOOKMARK,
     DESKTOP, TOOLS, SETTINGS, NIGHT, INCOGNITO, FIND, READER, SAVE_PAGE, ADD_HOME,
-    TRANSLATE, VIEW_SOURCE, PRINT, PAGE_INFO, COPY_URL, RELOAD, HOME, HELP, EXIT,
+    TRANSLATE, VIEW_SOURCE, PRINT, PAGE_INFO, COPY_URL, RELOAD, HOME, HELP, ABOUT, EXIT,
 }
 
 data class MenuEntry(val label: String, val icon: ImageVector, val action: MenuAction, val accent: Boolean = false)
@@ -388,7 +390,7 @@ private fun menuPages(tab: TabInfo?, bookmarked: Boolean, isDark: Boolean): List
         MenuEntry("Downloads", JumpIcons.Download, MenuAction.DOWNLOADS),
         MenuEntry("Settings", JumpIcons.Settings, MenuAction.SETTINGS),
         MenuEntry("Help", JumpIcons.Info, MenuAction.HELP),
-        MenuEntry("About", JumpIcons.Info, MenuAction.SETTINGS),
+        MenuEntry("About", JumpIcons.Info, MenuAction.ABOUT),
     )
     return listOf(pageOne, pageTwo, pageThree)
 }
@@ -403,6 +405,7 @@ private fun MenuSheetContent(
 ) {
     val pages = remember(tab, bookmarked, isDark) { menuPages(tab, bookmarked, isDark) }
     val pagerState = rememberPagerState(pageCount = { pages.size })
+    val scope = rememberCoroutineScope()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -449,7 +452,7 @@ private fun MenuSheetContent(
                 pages.indices.forEach { index ->
                     Box(Modifier.padding(horizontal = 4.dp)) {
                         Dot(selected = pagerState.currentPage == index) {
-                            // Clicking is a nice desktop affordance; pager itself owns the animation.
+                            scope.launch { pagerState.animateScrollToPage(index) }
                         }
                     }
                 }

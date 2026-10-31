@@ -117,6 +117,7 @@ fun QrScannerScreen(
                     val future = ProcessCameraProvider.getInstance(context)
                     future.addListener({
                         val provider = runCatching { future.get() }.getOrNull() ?: return@addListener
+                        if (cameraProvider === provider) return@addListener
                         cameraProvider = provider
                         val preview = Preview.Builder().build().also {
                             it.surfaceProvider = previewView.surfaceProvider

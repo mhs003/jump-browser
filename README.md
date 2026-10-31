@@ -36,6 +36,22 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
 - **Desktop mode, share, copy, save page, print, view source, translate, and
   home-screen shortcuts.**
 
+## Screens
+
+| | |
+|---|---|
+| ![Homepage](docs/screenshots/home.png) | ![Address bar](docs/screenshots/address-bar.png) |
+| **Homepage** with bookmark shortcut. | **Blueprint address bar** with live suggestions. |
+| ![Menu](docs/screenshots/menu.png) | ![Tabs](docs/screenshots/tabs.png) |
+| **Action sheet** with paged tools. | **Compact tab popup** anchored to the toolbar. |
+| ![Settings](docs/screenshots/settings.png) | ![Night mode](docs/screenshots/night-mode.png) |
+| **Settings** with granular controls. | **Night mode** across chrome and page content. |
+| ![Downloads](docs/screenshots/downloads.png) | ![Context menu](docs/screenshots/context-menu.png) |
+| **Download manager.** | **Long-press link and image actions.** |
+
+More captures: [page](docs/screenshots/page.png), [reader mode](docs/screenshots/reader.png),
+[bookmarks](docs/screenshots/bookmarks.png).
+
 ## Architecture
 
 Jump separates the browser engine from the interface:
@@ -62,7 +78,12 @@ tad build debug
 tad install
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+Debug builds are written to `app/build/outputs/apk/debug/app-debug.apk`.
+Minified release builds are written to `app/build/outputs/apk/release/app-release.apk`.
+
+A signed, installable release is included at `dist/Jump-1.0.0.apk` with checksums
+in `dist/SHA256SUMS.txt`. It is signed with the local debug key so it can be
+sideloaded; use a private release key before publishing to a store.
 
 ## Project layout
 
@@ -80,8 +101,13 @@ app/src/test/              unit tests for URL handling and models
 
 Core browsing, tabs, navigation, libraries, downloads, settings, reader mode,
 find in page, QR scanning, ad blocking, and the full chrome are implemented.
-Incognito tabs currently suppress history without isolating cookies, because
+The signed release is 2.2 MB.
+
+Known gaps: incognito tabs suppress history without isolating cookies because
 Android WebView profiles are only available on newer WebView providers.
+Bookmarks are flat rather than folder-based, and saved-page management is
+limited to the save action and a confirmation toast. These are deliberate
+extension points, not hidden behavior.
 
 ## License
 
