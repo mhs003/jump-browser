@@ -1,6 +1,7 @@
 package com.jump.browser
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
 import android.webkit.WebView
 import com.jump.browser.data.AppContainer
 
@@ -11,6 +12,8 @@ class JumpApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        runCatching { WebView.setWebContentsDebuggingEnabled(true) }
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            runCatching { WebView.setWebContentsDebuggingEnabled(true) }
+        }
     }
 }

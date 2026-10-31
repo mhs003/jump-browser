@@ -4,6 +4,7 @@ import android.app.DownloadManager
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -294,9 +295,13 @@ class DownloadRepository(
             .setTitle(safeName)
             .setDescription(url)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, safeName)
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
+        if (Build.VERSION.SDK_INT >= 29) {
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeName)
+        } else {
+            request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, safeName)
+        }
         if (!userAgent.isNullOrBlank()) request.addRequestHeader("User-Agent", userAgent)
         if (!contentDisposition.isNullOrBlank()) request.addRequestHeader("Content-Disposition", contentDisposition)
         if (!mime.isNullOrBlank()) request.setMimeType(mime)

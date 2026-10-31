@@ -6,6 +6,7 @@ import com.jump.browser.data.SearchEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import org.json.JSONTokener
 import java.net.HttpURLConnection
 import java.net.URL
@@ -72,15 +73,22 @@ object SuggestionSource {
                 val parsed = JSONTokener(body).nextValue()
                 when (parsed) {
                     is JSONArray -> {
-                        if (parsed.length() > 1) {
-                            when (val second = parsed.opt(1)) {
-                                is JSONArray -> (0 until second.length()).mapNotNull { second.optString(it).takeIf(String::isNotBlank) }
-                                else -> emptyList()
+                        if (parsed.length() > 1 && parsed.opt(0) is String && parsed.opt(1) is JSONArray) {
+                            val list = parsed.optJSONArray(1)
+                            (0 until list.length()).mapNotNull { list.optString(it).takeIf(String::isNotBlank) }
+                        } else {
+                            val out = mutableListOf<String>()
+                            for (i in 0 until parsed.length()) {
+                                when (val item = parsed.opt(i)) {
+                                    is JSONObject -> item.optString("phrase").takeIf(String::isNotBlank)?.let(out::add)
+                                    is String -> if (i > 0) item.takeIf(String::isNotBlank)?.let(out::add)
+                                    is JSONArray -> for (j in 0 until item.length()) {
+                                        item.optString(j).takeIf(String::isNotBlank)?.let(out::add)
+                                    }
+                                }
                             }
-                        } else if (parsed.length() == 1 && parsed.opt(0) is JSONArray) {
-                            val first = parsed.optJSONArray(0)
-                            (0 until first.length()).mapNotNull { first.optString(it).takeIf(String::isNotBlank) }
-                        } else emptyList()
+                            out
+                        }
                     }
                     is org.json.JSONObject -> {
                         val arr = parsed.optJSONArray("suggestions") ?: parsed.optJSONArray("results")
