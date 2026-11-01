@@ -14,6 +14,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +41,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -67,6 +69,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -109,22 +112,29 @@ fun TitleBar(
             icon = leftIcon,
             contentDescription = if (isHome) "Search" else "Site info",
             size = 22,
-            onClick = { if (isHome) onOpenAddress() else onLeftClick() },
+            onClick = onLeftClick,
         )
         Box(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .clickable { onOpenAddress() },
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onOpenAddress,
+                    onLongClick = onTitleLongClick,
+                ),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Text(
+            BasicText(
                 text = if (isHome) "Homepage" else (tab?.title?.ifBlank { tab.url } ?: ""),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(end = 4.dp),
+                style = TextStyle(
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                ),
+                modifier = Modifier.padding(start = 8.dp, end = 4.dp),
             )
         }
         val rightIcon = when {
@@ -141,6 +151,47 @@ fun TitleBar(
             },
             size = 22,
             onClick = onRightClick,
+        )
+    }
+}
+
+@Composable
+fun TitleActionPopup(
+    showCopy: Boolean,
+    onCopy: () -> Unit,
+    onPaste: () -> Unit,
+    onPasteAndGo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .height(48.dp)
+            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(17.dp))
+            .border(0.5.dp, Color(0x30808080), RoundedCornerShape(17.dp))
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (showCopy) TitleAction("Copy", onCopy)
+        TitleAction("Paste", onPaste)
+        TitleAction("Paste & Go", onPasteAndGo)
+    }
+}
+
+@Composable
+private fun TitleAction(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .height(48.dp)
+            .jumpClickable(androidx.compose.ui.graphics.RectangleShape, onClick = onClick)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            maxLines = 1,
+            color = MaterialTheme.colorScheme.onBackground,
         )
     }
 }
@@ -453,12 +504,8 @@ fun MenuOverlay(
     onAction: (MenuAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val slidePx = with(LocalDensity.current) { 60.dp.roundToPx() }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(160)),
-        exit = fadeOut(tween(160)),
-    ) {
+    val slidePx = with(LocalDensity.current) { 120.dp.roundToPx() }
+    if (visible) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -467,13 +514,13 @@ fun MenuOverlay(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
+            contentAlignment = Alignment.BottomCenter,
         ) {
             AnimatedVisibility(
                 visible = visible,
-                enter = slideInVertically(tween(160, easing = FastOutSlowInEasing)) { slidePx } + fadeIn(tween(160)),
-                exit = slideOutVertically(tween(160, easing = FastOutSlowInEasing)) { slidePx } + fadeOut(tween(160)),
+                enter = slideInVertically(tween(160, easing = FastOutLinearInEasing)) { slidePx } + fadeIn(tween(160)),
+                exit = slideOutVertically(tween(160, easing = FastOutLinearInEasing)) { slidePx } + fadeOut(tween(160)),
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(horizontal = 1.dp),
             ) {
@@ -557,18 +604,18 @@ private fun MenuSheetContent(
     }
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(16.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(238.dp)
+            .height(206.dp)
             .clip(shape)
             .border(1.dp, com.jump.browser.ui.theme.JumpPressed, shape),
         color = MaterialTheme.colorScheme.surface,
         shape = shape,
         tonalElevation = 0.dp,
     ) {
-        Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth().height(164.dp),
@@ -592,7 +639,7 @@ private fun MenuSheetContent(
                 }
             }
             Row(
-                Modifier.fillMaxWidth().height(14.dp),
+                Modifier.fillMaxWidth().height(12.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -629,8 +676,8 @@ fun TabPopup(
     onDismiss: () -> Unit,
     bottomInset: Int,
 ) {
-    val tabSlidePx = with(LocalDensity.current) { 60.dp.roundToPx() }
-    AnimatedVisibility(visible = visible, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) {
+    val tabSlidePx = with(LocalDensity.current) { 120.dp.roundToPx() }
+    if (visible) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -640,12 +687,13 @@ fun TabPopup(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
+            contentAlignment = Alignment.BottomCenter,
         ) {
             AnimatedVisibility(
                 visible = visible,
                 enter = slideInVertically(tween(160, easing = FastOutLinearInEasing)) { tabSlidePx } + fadeIn(tween(160)),
                 exit = slideOutVertically(tween(160, easing = FastOutLinearInEasing)) { tabSlidePx } + fadeOut(tween(160)),
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier,
             ) {
                 Surface(
                     Modifier

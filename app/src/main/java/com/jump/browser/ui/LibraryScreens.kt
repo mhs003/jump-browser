@@ -48,6 +48,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -55,6 +56,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -77,6 +79,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -1148,23 +1151,52 @@ fun ChoiceDialog(
         text = {
             Column {
                 options.forEach { (label, value) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(value) }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(label, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                        if (value == selected) {
-                            ChromeIcon(JumpIcons.Check, null, size = 19, tint = JumpAccent)
-                        }
-                    }
+                    JumpOptionRow(
+                        label = label,
+                        selected = value == selected,
+                        onClick = { onSelect(value) },
+                    )
                 }
             }
         },
-        confirmButton = { JumpDialogButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = {},
     )
+}
+
+/** Reference single-choice dialog row: 43dp, 18dp ring, 16sp label. */
+@Composable
+fun JumpOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(43.dp)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = androidx.compose.material3.ripple(color = com.jump.browser.ui.theme.JumpRipple),
+                onClick = onClick,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(if (selected) JumpAccent else Color.Transparent)
+                .border(
+                    width = 1.5.dp,
+                    color = if (selected) JumpAccent else MaterialTheme.colorScheme.outline,
+                    shape = CircleShape,
+                ),
+        )
+        Spacer(Modifier.width(21.dp))
+        BasicText(
+            text = label,
+            style = TextStyle(
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+            ),
+        )
+    }
 }
 
 @Composable

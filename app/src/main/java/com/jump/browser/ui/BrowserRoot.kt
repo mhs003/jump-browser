@@ -10,8 +10,13 @@ import android.net.Uri
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility as AnimVis
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -32,6 +37,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalConfiguration
@@ -107,6 +114,8 @@ fun BrowserRoot(
     val bottomInsetPx = navInsetPx + with(density) { 48.dp.roundToPx() }
 
     var editing by remember { mutableStateOf(false) }
+    var titleMenu by remember { mutableStateOf(false) }
+    var searchEngineDialog by remember { mutableStateOf(false) }
     var fullScreenAddress by remember { mutableStateOf(false) }
     var address by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
     var suggestions by remember { mutableStateOf(emptyList<SearchSuggestion>()) }
@@ -153,6 +162,7 @@ fun BrowserRoot(
     }
 
     fun closeAllOverlays() {
+        titleMenu = false
         showMenu = false
         showTabs = false
         editing = false
@@ -168,28 +178,34 @@ fun BrowserRoot(
         if (target != LibraryPage.NONE) shownPage = target
     }
 
-    fun startAddressEditing() {
-        val isHome = active?.isHome == true
-        fun open() {
-            val text = active?.url ?: ""
-            address = androidx.compose.ui.text.input.TextFieldValue(
-                text = text,
-                selection = androidx.compose.ui.text.TextRange(0, text.length),
-            )
-            editing = true
-            fullScreenAddress = false
-            showMenu = false
-            showTabs = false
-        }
-        if (isHome) {
-            homeDip = true
-            scope.launch {
-                kotlinx.coroutines.delay(120)
-                open()
-                kotlinx.coroutines.delay(80)
-                homeDip = false
-            }
-        } else open()
+    fun startAddressEditing(initialText: String? = null) {
+        val text = initialText ?: active?.url ?: ""
+        address = androidx.compose.ui.text.input.TextFieldValue(
+            text = text,
+            selection = androidx.compose.ui.text.TextRange(0, text.length),
+        )
+        editing = true
+        fullScreenAddress = false
+        titleMenu = false
+        showMenu = false
+        showTabs = false
+    }
+
+    fun clipboardText(): String {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+            as? android.content.ClipboardManager ?: return ""
+        return clipboard.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+    }
+
+    fun pasteIntoAddress() {
+        titleMenu = false
+        startAddressEditing(clipboardText())
+    }
+
+    fun pasteAndGo() {
+        titleMenu = false
+        val text = clipboardText().trim()
+        if (text.isNotEmpty()) controller.navigate(text)
     }
 
     fun closeEditing() {
@@ -217,6 +233,8 @@ fun BrowserRoot(
 
     BackHandler {
         when {
+            titleMenu -> titleMenu = false
+            searchEngineDialog -> searchEngineDialog = false
             clearDataDialog -> clearDataDialog = false
             immersive -> immersive = false
             controller.hasFullscreen() -> controller.exitFullscreen()
@@ -301,13 +319,13 @@ fun BrowserRoot(
                 onCloseAddress = { closeEditing() },
                 onSubmitAddress = { submitAddress() },
                 onExpandAddress = { fullScreenAddress = true },
-                onLeftClick = { siteInfoDialog = true },
+                onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                 onRightClick = {
                     if (active?.isHome != false) qrScreen = true
                     else if (active?.loading == true) controller.stopLoading()
                     else controller.reload()
                 },
-                onTitleLongClick = { controller.copyUrl(active?.url) },
+                onTitleLongClick = { titleMenu = true },
             )
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView(
@@ -638,6 +656,69 @@ fun BrowserRoot(
             )
         }
 
+        if (titleMenu) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                    ) { titleMenu = false },
+            )
+        }
+        if (searchEngineDialog) {
+            SearchEngineDialog(
+                selected = settings.searchEngineId,
+                onDismiss = { searchEngineDialog = false },
+                onSelect = { id ->
+                    container.settings.update { it.copy(searchEngineId = id) }
+                    controller.applySettingsToAll()
+                    searchEngineDialog = false
+                },
+            )
+        }
+
+        AnimVis(
+            visible = titleMenu,
+            enter = fadeIn(tween(240)) + scaleIn(
+                initialScale = 0.9f,
+                transformOrigin = TransformOrigin(0.5f, 1f),
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            ) + slideInVertically(
+                animationSpec = tween(240),
+                initialOffsetY = { (it * 0.1f).toInt() },
+            ),
+            exit = fadeOut(tween(240, easing = FastOutLinearInEasing)) + scaleOut(
+                targetScale = 0.9f,
+                transformOrigin = TransformOrigin(0.5f, 1f),
+                animationSpec = tween(240),
+            ) + slideOutVertically(
+                animationSpec = tween(240),
+                targetOffsetY = { (it * 0.1f).toInt() },
+            ),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset(
+                    x = 6.dp,
+                    y = with(density) {
+                        WindowInsets.statusBars.getTop(density).toDp()
+                    } + 48.dp,
+                ),
+        ) {
+            TitleActionPopup(
+                showCopy = active?.isHome == false && active?.url?.isNotBlank() == true,
+                onCopy = {
+                    titleMenu = false
+                    controller.copyUrl(active?.url)
+                },
+                onPaste = { pasteIntoAddress() },
+                onPasteAndGo = { pasteAndGo() },
+            )
+        }
+
         JumpToastHost()
     }
 
@@ -859,6 +940,31 @@ private fun AddressScrim(visible: Boolean, onClick: () -> Unit) {
                 ) { onClick() },
         )
     }
+}
+
+@Composable
+private fun SearchEngineDialog(
+    selected: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    val options = com.jump.browser.data.SearchEngine.reference
+    JumpAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Search engine") },
+        text = {
+            Column {
+                options.forEach { engine ->
+                    JumpOptionRow(
+                        label = engine.name,
+                        selected = engine.id == selected,
+                        onClick = { onSelect(engine.id) },
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+    )
 }
 
 @Composable

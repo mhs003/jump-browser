@@ -124,11 +124,16 @@ data class SearchEngine(
             "https://api.bing.com/osjson.aspx?query=%s",
         )
         val BAIDU = SearchEngine("baidu", "Baidu", "https://www.baidu.com/s?wd=%s")
+        val YAHOO = SearchEngine("yahoo", "Yahoo", "https://search.yahoo.com/search?p=%s")
+        val STARTPAGE = SearchEngine("startpage", "StartPage", "https://www.startpage.com/do/search?query=%s")
         val BRAVE = SearchEngine("brave", "Brave", "https://search.brave.com/search?q=%s")
         val YANDEX = SearchEngine("yandex", "Yandex", "https://yandex.com/search/?text=%s")
         val CUSTOM = SearchEngine("custom", "Custom", "https://www.google.com/search?q=%s")
 
-        val all = listOf(GOOGLE, DUCKDUCKGO, BING, BAIDU, BRAVE, YANDEX, CUSTOM)
+        /** The reference dialog lists exactly these engines, in this order. */
+        val reference = listOf(GOOGLE, BAIDU, BING, YAHOO, STARTPAGE, DUCKDUCKGO)
+
+        val all = listOf(GOOGLE, BAIDU, BING, YAHOO, STARTPAGE, DUCKDUCKGO, BRAVE, YANDEX, CUSTOM)
 
         fun byId(id: String): SearchEngine = all.firstOrNull { it.id == id } ?: GOOGLE
     }

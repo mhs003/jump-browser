@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -304,16 +305,16 @@ fun MenuCell(
         modifier = Modifier
             .fillMaxSize()
             .jumpClickable(RoundedCornerShape(18.dp), enabled, onClick)
-            .padding(start = 5.dp, top = 15.dp, end = 5.dp, bottom = 6.5.dp),
+            .padding(start = 4.dp, top = 10.dp, end = 4.dp, bottom = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(7.75.dp))
         Text(
             label,
             color = tint,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             lineHeight = 13.sp,
             minLines = 2,
             maxLines = 2,
@@ -472,16 +473,22 @@ fun JumpCheckbox(
     ) {
         Box(
             Modifier
-                .size(16.dp)
+                .size(18.dp)
                 .clip(CircleShape)
                 .background(if (checked) JumpAccent else Color.Transparent)
-                .border(2.dp, if (checked) JumpAccent else JumpPressed, CircleShape),
+                .border(
+                    width = 1.5.dp,
+                    color = if (checked) JumpAccent else MaterialTheme.colorScheme.outline,
+                    shape = CircleShape,
+                ),
         )
-        Spacer(Modifier.width(24.dp))
-        Text(
-            label,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Spacer(Modifier.width(21.dp))
+        BasicText(
+            text = label,
+            style = TextStyle(
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+            ),
         )
     }
 }
@@ -520,6 +527,9 @@ fun JumpAlertDialog(
         scale.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 520f))
     }
 
+    val cardHeight = remember {
+        androidx.compose.runtime.mutableFloatStateOf(0f)
+    }
     Dialog(
         onDismissRequest = { close() },
         properties = DialogProperties(
@@ -549,13 +559,16 @@ fun JumpAlertDialog(
                 modifier = modifier
                     .fillMaxWidth(0.8f)
                     .widthIn(max = 288.dp)
-                    .onSizeChanged { cardWidth = it.width }
+                    .onSizeChanged {
+                        cardWidth = it.width
+                        cardHeight.value = it.height.toFloat()
+                    }
                     .offset { IntOffset(drag.value.roundToInt(), 0) }
                     .graphicsLayer {
                         scaleX = scale.value
                         scaleY = scale.value
                         alpha = contentAlpha.value
-                        translationY = (1f - scale.value) * 32.dp.toPx()
+                        translationY = (1f - scale.value) * cardHeight.value * 0.10f
                     }
                     .border(0.dp, Color.Transparent)
                     .pointerInput(Unit) {
