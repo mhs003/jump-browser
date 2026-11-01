@@ -115,11 +115,10 @@ fun HomePage(
         }
         Column(
             Modifier
-                .fillMaxSize()
-                .padding(horizontal = 18.dp),
+                .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // The homepage body begins 135px below the WebView top for this viewport.
+            // #content top:135px (450px viewport) plus the logo intrinsic gap.
             Spacer(Modifier.height(135.dp))
             val logoBitmap = remember(logoPath) {
                 if (logoPath.isBlank()) null
@@ -137,13 +136,12 @@ fun HomePage(
                     JumpLogo(Modifier.size(99.dp, 72.dp))
                 }
             }
-            Spacer(Modifier.height(22.dp))
-            // .search_part is 90% wide with a 15dp gap before the 46dp field.
-            if (searchBarEnabled) Spacer(Modifier.height(15.dp))
+            // Inline logo leaves a 9dp descender gap; the field follows a 22dp block gap.
+            if (searchBarEnabled) Spacer(Modifier.height(22.dp))
             if (searchBarEnabled) Box(
                 Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 600.dp)
+                    .fillMaxWidth(0.9f)
+                    .widthIn(max = 540.dp)
                     .height(46.dp)
                     .clip(RoundedCornerShape(13.dp))
                     .background(Color.Transparent)
@@ -180,7 +178,10 @@ private fun HomeShortcuts(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         bookmarks.chunked(6).forEach { rowItems ->
-            Row(horizontalArrangement = Arrangement.Center) {
+            Row(
+                Modifier.fillMaxWidth(0.9f).widthIn(max = 540.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
                 rowItems.forEach { bookmark ->
                     FavoriteTile(bookmark, colorsEnabled, onClick)
                     Spacer(Modifier.width(18.dp))
