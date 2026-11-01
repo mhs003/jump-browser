@@ -669,7 +669,7 @@ private fun MenuSheetContent(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(206.dp)
+            .height(214.dp)
             .clip(shape)
             .border(1.dp, com.jump.browser.ui.theme.JumpPressed, shape),
         color = MaterialTheme.colorScheme.surface,
@@ -679,7 +679,7 @@ private fun MenuSheetContent(
         Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth().height(148.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f),
             ) { page ->
                 Column(Modifier.fillMaxSize()) {
                     pages[page].chunked(5).take(2).forEach { row ->
@@ -715,7 +715,7 @@ private fun MenuSheetContent(
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .offset(y = (-8).dp),
+                    .offset(y = (-12).dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.weight(1f))
