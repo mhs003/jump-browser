@@ -125,15 +125,15 @@ fun FindBar(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Surface(
-        modifier = Modifier.fillMaxWidth().height(64.dp),
+        modifier = Modifier.fillMaxWidth().height(40.dp),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        shadowElevation = 6.dp,
+        shape = RoundedCornerShape(20.dp),
+        shadowElevation = 0.dp,
     ) {
         Row(
             Modifier
                 .fillMaxSize()
-                .padding(start = 34.dp, end = 12.dp),
+                .padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
