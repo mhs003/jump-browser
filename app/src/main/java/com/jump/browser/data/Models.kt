@@ -164,6 +164,10 @@ data class AppSettings(
     val homepageBackgroundOpacity: Int = 100,
     val homepageSearchBar: Boolean = true,
     val homepageFavoriteColor: Boolean = true,
+    val toolbarPosition: String = "TOP",        // TOP, BOTTOM, BOTTOM_SLIM
+    val toolbarLayout: String = "ADDRESS_FIRST", // ADDRESS_FIRST, TITLE_AND_ADDRESS
+    val toolbarSearch: Boolean = true,
+    val customizeMenu: List<String> = emptyList(),
 ) {
     val searchEngine: SearchEngine
         get() {

@@ -41,6 +41,13 @@ class SettingsRepository(private val context: Context) {
                 homepageBackgroundOpacity = o.optInt("homepageBackgroundOpacity", defaults.homepageBackgroundOpacity),
                 homepageSearchBar = o.optBoolean("homepageSearchBar", defaults.homepageSearchBar),
                 homepageFavoriteColor = o.optBoolean("homepageFavoriteColor", defaults.homepageFavoriteColor),
+                toolbarPosition = o.optString("toolbarPosition", defaults.toolbarPosition),
+                toolbarLayout = o.optString("toolbarLayout", defaults.toolbarLayout),
+                toolbarSearch = o.optBoolean("toolbarSearch", defaults.toolbarSearch),
+                customizeMenu = runCatching {
+                    val arr = o.optJSONArray("customizeMenu") ?: return@runCatching emptyList<String>()
+                    (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotEmpty() }
+                }.getOrDefault(emptyList()),
                 customSearchUrl = o.optString("customSearchUrl", defaults.customSearchUrl),
                 homepageUrl = o.optString("homepageUrl", defaults.homepageUrl),
                 darkMode = runCatching { DarkMode.valueOf(o.optString("darkMode", "LIGHT")) }
@@ -78,6 +85,10 @@ class SettingsRepository(private val context: Context) {
             .put("homepageBackgroundOpacity", s.homepageBackgroundOpacity)
             .put("homepageSearchBar", s.homepageSearchBar)
             .put("homepageFavoriteColor", s.homepageFavoriteColor)
+            .put("toolbarPosition", s.toolbarPosition)
+            .put("toolbarLayout", s.toolbarLayout)
+            .put("toolbarSearch", s.toolbarSearch)
+            .put("customizeMenu", org.json.JSONArray(s.customizeMenu))
             .put("customSearchUrl", s.customSearchUrl)
             .put("homepageUrl", s.homepageUrl)
             .put("darkMode", s.darkMode.name)

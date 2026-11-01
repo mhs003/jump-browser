@@ -332,25 +332,49 @@ fun BrowserRoot(
                 .fillMaxSize()
                 .graphicsLayer { translationX = -screenWidthPx * 0.30f * pageProgress },
         ) {
-            Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-            TopChrome(
-                editing = editing,
-                tab = active,
-                addressValue = address,
-                onAddressValueChange = { address = it },
-                onOpenAddress = { startAddressEditing() },
-                onCloseAddress = { closeEditing() },
-                onSubmitAddress = { submitAddress() },
-                onExpandAddress = { fullScreenAddress = true },
-                onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
-                onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
-                onRightClick = {
-                    if (active?.isHome != false) qrScreen = true
-                    else if (active?.loading == true) controller.stopLoading()
-                    else controller.reload()
-                },
-                onTitleLongClick = { titleMenu = true },
-            )
+            val bottomToolbar = settings.toolbarPosition != "TOP"
+            if (bottomToolbar) {
+                Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                TopChrome(
+                    editing = editing,
+                    tab = active,
+                    addressValue = address,
+                    onAddressValueChange = { address = it },
+                    onOpenAddress = { startAddressEditing() },
+                    onCloseAddress = { closeEditing() },
+                    onSubmitAddress = { submitAddress() },
+                    onExpandAddress = { fullScreenAddress = true },
+                    onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                    onRightClick = {
+                        if (active?.isHome != false) qrScreen = true
+                        else if (active?.loading == true) controller.stopLoading()
+                        else controller.reload()
+                    },
+                    onTitleLongClick = { titleMenu = true },
+                    onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                )
+            }
+            if (!bottomToolbar) {
+                Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                TopChrome(
+                    editing = editing,
+                    tab = active,
+                    addressValue = address,
+                    onAddressValueChange = { address = it },
+                    onOpenAddress = { startAddressEditing() },
+                    onCloseAddress = { closeEditing() },
+                    onSubmitAddress = { submitAddress() },
+                    onExpandAddress = { fullScreenAddress = true },
+                    onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                    onRightClick = {
+                        if (active?.isHome != false) qrScreen = true
+                        else if (active?.loading == true) controller.stopLoading()
+                        else controller.reload()
+                    },
+                    onTitleLongClick = { titleMenu = true },
+                    onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                )
+            }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView(
                     factory = { ctx ->
@@ -437,33 +461,65 @@ fun BrowserRoot(
                     }
                 }
             }
-            BottomBar(
-                tab = active,
-                tabs = controller.tabs,
-                onBack = { controller.goBack() },
-                onForward = { controller.goForward() },
-                onHome = { closeAllOverlays(); controller.goHome() },
-                onNewTab = { controller.newHomeTab() },
-                onMenuLong = { openPage(LibraryPage.SETTINGS) },
-                onBackLong = { controller.scrollToTop() },
-                onForwardLong = { controller.scrollToBottom() },
-                onTabs = {
-                    if (showTabs) showTabs = false
-                    else {
-                        showMenu = false
-                        closeEditing()
-                        showTabs = true
-                    }
-                },
-                onMenu = {
-                    if (showMenu) showMenu = false
-                    else {
-                        showTabs = false
-                        closeEditing()
-                        showMenu = true
-                    }
-                },
-            )
+            if (!bottomToolbar) {
+                BottomBar(
+                    tab = active,
+                    tabs = controller.tabs,
+                    onBack = { controller.goBack() },
+                    onForward = { controller.goForward() },
+                    onHome = { closeAllOverlays(); controller.goHome() },
+                    onNewTab = { controller.newHomeTab() },
+                    onMenuLong = { openPage(LibraryPage.SETTINGS) },
+                    onBackLong = { controller.scrollToTop() },
+                    onForwardLong = { controller.scrollToBottom() },
+                    onTabs = {
+                        if (showTabs) showTabs = false
+                        else {
+                            showMenu = false
+                            closeEditing()
+                            showTabs = true
+                        }
+                    },
+                    onMenu = {
+                        if (showMenu) showMenu = false
+                        else {
+                            showTabs = false
+                            closeEditing()
+                            showMenu = true
+                        }
+                    },
+                )
+            } else {
+                Column(Modifier.fillMaxWidth()) {
+                    BottomBar(
+                        tab = active,
+                        tabs = controller.tabs,
+                        onBack = { controller.goBack() },
+                        onForward = { controller.goForward() },
+                        onHome = { closeAllOverlays(); controller.goHome() },
+                        onNewTab = { controller.newHomeTab() },
+                        onMenuLong = { openPage(LibraryPage.SETTINGS) },
+                        onBackLong = { controller.scrollToTop() },
+                        onForwardLong = { controller.scrollToBottom() },
+                        onTabs = {
+                            if (showTabs) showTabs = false
+                            else {
+                                showMenu = false
+                                closeEditing()
+                                showTabs = true
+                            }
+                        },
+                        onMenu = {
+                            if (showMenu) showMenu = false
+                            else {
+                                showTabs = false
+                                closeEditing()
+                                showMenu = true
+                            }
+                        },
+                    )
+                }
+            }
         }
 
         MenuOverlay(

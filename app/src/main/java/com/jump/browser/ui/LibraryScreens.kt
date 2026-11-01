@@ -813,7 +813,7 @@ fun SettingsScreen(
                     item { SettingsLabelRow("Reader mode", if (settings.readerMode) "On" else null) {
                         onSettingsChange { it.copy(readerMode = !it.readerMode) }
                     } }
-                    item { SettingsLabelRow("Toolbars settings") { toast("Address bar position: top") } }
+                    item { SettingsLabelRow("Toolbars settings") { dialog = "toolbars" } }
                     item { SettingsLabelRow("Customize menu") { toast("Menu customization is not available") } }
                     item { SettingsLabelRow("Customize context menu") { toast("Context menu customization is not available") } }
                     item { SettingsLabelRow("Language", "System") { toast("Language follows Android") } }
@@ -1106,6 +1106,38 @@ fun SettingsScreen(
                 }) { Text("Save") }
             },
             dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+    if (dialog == "toolbars") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Toolbars") },
+            text = {
+                Column {
+                    JumpOptionRow(
+                        label = "Address bar on top",
+                        selected = settings.toolbarPosition == "TOP",
+                    ) { onSettingsChange { it.copy(toolbarPosition = "TOP") }; dialog = null }
+                    JumpOptionRow(
+                        label = "Address bar and toolbar below",
+                        selected = settings.toolbarPosition == "BOTTOM",
+                    ) { onSettingsChange { it.copy(toolbarPosition = "BOTTOM") }; dialog = null }
+                    JumpOptionRow(
+                        label = "Slim address bar",
+                        selected = settings.toolbarLayout == "SLIM",
+                    ) {
+                        onSettingsChange {
+                            it.copy(
+                                toolbarLayout = "SLIM",
+                                toolbarPosition = "BOTTOM",
+                                toolbarSearch = false,
+                            )
+                        }
+                        dialog = null
+                    }
+                }
+            },
+            confirmButton = {},
         )
     }
     if (dialog == "backgroundOpacity") {
