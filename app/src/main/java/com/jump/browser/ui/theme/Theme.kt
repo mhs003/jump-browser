@@ -2,14 +2,21 @@ package com.jump.browser.ui.theme
 
 import android.app.Activity
 import android.os.Build
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -86,6 +93,12 @@ private val JumpTypography = Typography(
     labelSmall = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 10.sp),
 )
 
+private object NoIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode = object : Modifier.Node() {}
+    override fun equals(other: Any?): Boolean = other === this
+    override fun hashCode(): Int = 0
+}
+
 @Composable
 fun JumpTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -108,9 +121,13 @@ fun JumpTheme(
             }
         }
     }
-    MaterialTheme(
-        colorScheme = scheme,
-        typography = JumpTypography,
-        content = content,
-    )
+    CompositionLocalProvider(
+        LocalIndication provides NoIndication,
+    ) {
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = JumpTypography,
+            content = content,
+        )
+    }
 }

@@ -81,6 +81,22 @@ All repositories publish immutable lists through Compose `mutableStateOf`.
 - **Downloads** — DownloadManager IDs plus display metadata; progressive state
   is queried from DownloadManager on a lightweight polling coroutine.
 
+### Icon system
+
+Chrome glyphs are stored in `ReferenceIcons.kt` as 88-unit filled outlines
+traced from the reference 88px glyphs, rendered at 22dp for toolbar/slot icons
+and 24dp for menu cells. This preserves the source stroke weight and exact
+silhouette instead of approximating icons with Material assets. Generic symbols
+that the reference does not expose as glyphs remain in `JumpIcons.kt`.
+
+### Feedback
+
+Ripple is deliberately absent from the browser chrome, scrims, sheets, tabs,
+list rows and address backdrop, matching the reference pressed-background
+behavior. Pressed chrome controls use a rounded `#30808080` overlay. Material
+dialog buttons are the exception and keep their ripple because the reference
+dialogs use ripple buttons.
+
 ### UI composition
 
 `BrowserRoot` is a single full-screen `Box` containing:
@@ -99,7 +115,9 @@ dialogs
 
 The WebView host is always present under the chrome, so opening the library or
 menu does not destroy or reload the page. Overlays are full-size surfaces with
-their own status-inset handling.
+their own status-inset handling. Reader mode is rendered inside the page area,
+so the title bar, page security state and bottom toolbar remain visible, as in
+the reference.
 
 ## Layout rhythm
 

@@ -422,6 +422,17 @@ class BrowserController(
         contextMenu = null
     }
 
+    fun scrollToTop() {
+        activeWebView()?.evaluateJavascript("window.scrollTo({top:0,behavior:'smooth'});", null)
+    }
+
+    fun scrollToBottom() {
+        activeWebView()?.evaluateJavascript(
+            "window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});",
+            null,
+        )
+    }
+
     fun openExternal(url: String) {
         runCatching {
             activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))

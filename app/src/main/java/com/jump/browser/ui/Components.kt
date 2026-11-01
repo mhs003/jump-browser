@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -115,10 +116,10 @@ fun TabCountBadge(
     val multiple = count > 1
     Box(modifier = modifier.size(48.dp), contentAlignment = Alignment.Center) {
         Icon(
-            imageVector = JumpIcons.Tabs,
+            imageVector = ReferenceIcons.Tabs,
             contentDescription = null,
             tint = tint.copy(alpha = if (multiple) 0.15f else 1f),
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(22.dp),
         )
         Text(
             text = when {
@@ -127,11 +128,24 @@ fun TabCountBadge(
                 else -> count.toString()
             },
             color = tint,
-            fontSize = if (multiple && count > 9) 9.sp else 11.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
     }
+}
+
+@Composable
+fun Modifier.pressable(
+    shape: Shape = RoundedCornerShape(18.dp),
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    return this
+        .background(if (pressed && enabled) JumpPressed else Color.Transparent, shape)
+        .clickable(interactionSource = interaction, indication = null, enabled = enabled) { onClick() }
 }
 
 @Composable
@@ -199,7 +213,7 @@ fun Favicon(
             )
         } else {
             Icon(
-                imageVector = JumpIcons.Globe,
+                imageVector = ReferenceIcons.Globe,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.size((size - 4).dp),
@@ -222,10 +236,11 @@ fun DividerLine(modifier: Modifier = Modifier) {
 fun Dot(selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(if (selected) 7.dp else 6.dp)
+            .padding(horizontal = 2.dp)
+            .size(4.dp)
             .clip(CircleShape)
             .background(
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) 0.45f else 0.12f)
             )
             .clickable { onClick() }
     )
@@ -247,16 +262,16 @@ fun MenuCell(
             .clip(RoundedCornerShape(18.dp))
             .background(if (pressed && enabled) JumpPressed else Color.Transparent)
             .clickable(interactionSource = interaction, indication = null, enabled = enabled) { onClick() }
-            .padding(start = 5.dp, top = 15.dp, end = 5.dp, bottom = 12.5.dp),
+            .padding(start = 5.dp, top = 15.dp, end = 5.dp, bottom = 6.5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.height(4.5.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             label,
             color = tint,
-            fontSize = 10.5.sp,
+            fontSize = 11.sp,
             lineHeight = 13.sp,
             minLines = 2,
             maxLines = 2,

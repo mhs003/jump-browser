@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,48 +48,39 @@ import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.JumpMuted
 
 @Composable
-fun ReaderScreen(data: ReaderData, onBack: () -> Unit) {
-    var size by remember { mutableIntStateOf(18) }
-    ScreenScaffold(
-        title = "Reader",
-        onBack = onBack,
-        actions = {
-            ChromeButton(JumpIcons.Minus, "Smaller text", enabled = size > 14) { size -= 1 }
-            ChromeButton(JumpIcons.Plus, "Larger text", enabled = size < 26) { size += 1 }
-        },
+fun ReaderContent(data: ReaderData, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
+            .padding(top = 28.dp, bottom = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        SelectionContainer {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 20.dp, bottom = 40.dp),
-            ) {
-                Text(
-                    data.title,
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 34.sp,
-                )
-                if (data.byline.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(data.byline, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(data.url, fontSize = 11.sp, color = JumpAccent, maxLines = 1)
-                Spacer(Modifier.height(18.dp))
-                DividerLine()
-                Spacer(Modifier.height(18.dp))
-                Text(
-                    data.text,
-                    fontSize = size.sp,
-                    lineHeight = (size * 1.62).sp,
-                    fontFamily = FontFamily.Serif,
-                )
-            }
-        }
+        Text(
+            data.title,
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 30.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            com.jump.browser.browser.UrlUtils.displayHost(data.url),
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(28.dp))
+        Text(
+            data.text,
+            fontSize = 18.sp,
+            lineHeight = 31.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
     }
 }
 
@@ -131,42 +124,48 @@ fun FindBar(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(start = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shadowElevation = 6.dp,
     ) {
-        Box(Modifier.weight(1f)) {
-            if (query.isEmpty()) {
-                Text("Find in page", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            Modifier
+                .fillMaxSize()
+                .padding(start = 34.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) {
+                if (query.isEmpty()) {
+                    Text("Find in page", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onNext() }),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                )
             }
-            BasicTextField(
-                value = query,
-                onValueChange = onQuery,
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onNext() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus),
-            )
+            if (query.isNotEmpty()) {
+                Text(
+                    if (matches.second == 0) "0/0" else "${matches.first + 1}/${matches.second}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                ChromeButton(ReferenceIcons.ChevronUp, "Previous match", size = 22, onClick = onPrev)
+                ChromeButton(ReferenceIcons.ChevronDown, "Next match", size = 22, onClick = onNext)
+            }
+            ChromeButton(ReferenceIcons.Close, "Close find", size = 22, onClick = onClose)
         }
-        Text(
-            if (matches.second == 0) "0/0" else "${matches.first}/${matches.second}",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
-        ChromeButton(JumpIcons.ChevronUp, "Previous match", size = 22, onClick = onPrev)
-        ChromeButton(JumpIcons.ChevronDown, "Next match", size = 22, onClick = onNext)
-        ChromeButton(JumpIcons.Close, "Close find", size = 22, onClick = onClose)
-        Spacer(Modifier.width(4.dp))
     }
 }
 
@@ -185,7 +184,7 @@ fun ErrorPage(
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            JumpIcons.Globe,
+            ReferenceIcons.Globe,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(54.dp),

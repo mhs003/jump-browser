@@ -154,7 +154,7 @@ fun QrScannerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(JumpIcons.QR, null, tint = Color.White, modifier = Modifier.size(58.dp))
+                Icon(ReferenceIcons.QrScan, null, tint = Color.White, modifier = Modifier.size(58.dp))
                 Spacer(Modifier.height(18.dp))
                 Text("Camera access is needed to scan QR codes", color = Color.White, fontSize = 17.sp)
                 Spacer(Modifier.height(18.dp))
@@ -177,7 +177,7 @@ fun QrScannerScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ChromeButton(
-                icon = JumpIcons.Back,
+                icon = ReferenceIcons.Back,
                 contentDescription = "Back",
                 tint = Color.White,
                 onClick = onBack,

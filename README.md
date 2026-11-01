@@ -35,6 +35,9 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
   controls, and one-tap browsing-data clearing.
 - **Desktop mode, share, copy, save page, print, view source, translate, and
   home-screen shortcuts.**
+- **Reference feedback language.** Chrome, sheets and list rows use the
+  reference pressed-background treatment without ripple; dialog buttons retain
+  the reference ripple.
 
 ## Screens
 
@@ -46,11 +49,13 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
 | **Action sheet** with paged tools. | **Compact tab popup** anchored to the toolbar. |
 | ![Settings](docs/screenshots/settings.png) | ![Settings detail](docs/screenshots/settings-general.png) |
 | **Settings categories.** | **General settings** with value subtitles. |
+| ![Page](docs/screenshots/page.png) | ![Site info](docs/screenshots/site-info.png) |
+| **Page chrome** with security state. | **Site info panel.** |
 | ![Downloads](docs/screenshots/downloads.png) | ![Context menu](docs/screenshots/context-menu.png) |
 | **Download manager.** | **Long-press link and image actions.** |
 
-More captures: [page](docs/screenshots/page.png), [bookmarks and history](docs/screenshots/bookmarks.png),
-[night mode](docs/screenshots/night-mode.png), [reader mode](docs/screenshots/reader.png).
+More captures: [bookmarks and history](docs/screenshots/bookmarks.png),
+[night mode](docs/screenshots/night-mode.png).
 
 ## Architecture
 

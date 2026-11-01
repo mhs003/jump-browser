@@ -1,6 +1,9 @@
 package com.jump.browser.ui
 
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Environment
+import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -52,7 +56,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
@@ -73,6 +79,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.widget.Toast
 import java.util.Locale
 
@@ -93,7 +101,7 @@ fun ScreenScaffold(
             Modifier.fillMaxWidth().height(48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ChromeButton(JumpIcons.Back, "Back", onClick = onBack)
+            ChromeButton(ReferenceIcons.Back, "Back", onClick = onBack)
             Text(
                 text = title,
                 modifier = Modifier.weight(1f),
@@ -198,31 +206,34 @@ fun RecordsScreen(
             .statusBarsPadding()
     ) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            ChromeButton(JumpIcons.Back, "Back", onClick = onBack)
+            ChromeButton(ReferenceIcons.Back, "Back", onClick = onBack)
             Row(
-                Modifier.weight(1f).padding(start = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(25.dp),
+                Modifier.weight(1f).padding(start = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 labels.forEachIndexed { index, label ->
                     Text(
                         label,
                         fontSize = 16.sp,
-                        fontWeight = if (tab == index) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = FontWeight.Normal,
                         color = if (tab == index) MaterialTheme.colorScheme.onBackground
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        modifier = Modifier.clickable {
-                            tab = index
-                            query = ""
-                            resetMode()
-                        }.padding(vertical = 4.dp),
+                        modifier = Modifier
+                            .offset(y = 2.5.dp)
+                            .clickable {
+                                tab = index
+                                query = ""
+                                resetMode()
+                            }
+                            .padding(vertical = 4.dp),
                     )
                 }
             }
         }
         DividerLine()
-        LibrarySearchField(query, { query = it }, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        LibrarySearchField(query, { query = it }, Modifier.padding(horizontal = 14.dp, vertical = 12.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (!hasRows) {
                 EmptyMeme()
@@ -256,7 +267,7 @@ fun RecordsScreen(
                                 RecordRow(
                                     title = entry.title.ifBlank { entry.url },
                                     subtitle = entry.url,
-                                    icon = { ChromeIcon(JumpIcons.Clock, null, size = 22) },
+                                    icon = { ChromeIcon(ReferenceIcons.Clock, null, size = 22) },
                                     editing = editing,
                                     selected = entry.id in selected,
                                     onClick = {
@@ -379,7 +390,7 @@ private fun LibrarySearchField(
             .height(44.dp)
             .clip(RoundedCornerShape(22.dp))
             .background(Color(0xFFF2F2F2))
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         if (query.isEmpty()) {
@@ -512,11 +523,11 @@ fun DownloadsScreen(
             .statusBarsPadding()
     ) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            ChromeButton(JumpIcons.Back, "Back", onClick = onBack)
+            ChromeButton(ReferenceIcons.Back, "Back", onClick = onBack)
             Text("Downloads", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         }
         DividerLine()
-        LibrarySearchField(query, { query = it }, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        LibrarySearchField(query, { query = it }, Modifier.padding(horizontal = 14.dp, vertical = 12.dp))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -525,9 +536,9 @@ fun DownloadsScreen(
                 val active = filter == index
                 Box(
                     Modifier
-                        .height(24.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, if (active) MaterialTheme.colorScheme.primary else Color(0xFFD3D3D3), RoundedCornerShape(12.dp))
+                        .height(22.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .border(1.dp, if (active) MaterialTheme.colorScheme.primary else Color(0xFFD3D3D3), RoundedCornerShape(11.dp))
                         .clickable { filter = index }
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,
@@ -613,6 +624,50 @@ fun DownloadsScreen(
 }
 
 @Composable
+private fun DownloadRecordIcon(task: DownloadTask) {
+    val context = LocalContext.current
+    var icon by remember(task.localUri, task.title) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(task.localUri, task.title) {
+        if (task.localUri == null || task.state != DownloadState.COMPLETE) return@LaunchedEffect
+        icon = withContext(Dispatchers.IO) {
+            runCatching {
+                when {
+                    task.isImage() -> {
+                        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                        context.contentResolver.openInputStream(Uri.parse(task.localUri))?.use {
+                            BitmapFactory.decodeStream(it, null, options)?.asImageBitmap()
+                        }
+                    }
+                    task.isApk() -> {
+                        val path = java.io.File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                            task.title,
+                        ).absolutePath
+                        val info = context.packageManager.getPackageArchiveInfo(path, 0)
+                            ?: return@runCatching null
+                        val appInfo = info.applicationInfo ?: return@runCatching null
+                        appInfo.sourceDir = path
+                        appInfo.publicSourceDir = path
+                        context.packageManager.getApplicationIcon(appInfo).toBitmap().asImageBitmap()
+                    }
+                    else -> null
+                }
+            }.getOrNull()
+        }
+    }
+    Box(
+        Modifier.size(30.dp).clip(RoundedCornerShape(6.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (icon != null) {
+            Image(icon!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Icon(ReferenceIcons.Download, contentDescription = null, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
 private fun DownloadRecordRow(
     task: DownloadTask,
     editing: Boolean,
@@ -626,9 +681,7 @@ private fun DownloadRecordRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
-            Icon(JumpIcons.Download, contentDescription = null, modifier = Modifier.size(22.dp))
-        }
+        DownloadRecordIcon(task)
         Column(Modifier.weight(1f).padding(start = 8.dp)) {
             Text(task.title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
@@ -696,7 +749,7 @@ fun SettingsScreen(
     ) {
         when (category) {
             null -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     listOf("General", "Customization", "Privacy", "Advanced", "Scripts", "About").forEach { title ->
                         item { SettingsLabelRow(title) { category = title } }
                     }
@@ -704,7 +757,7 @@ fun SettingsScreen(
                 }
             }
             "General" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Sync") { toast("Sync is not enabled") } }
                     item { SettingsLabelRow("User-agent", "Default") { toast("Uses the mobile user agent") } }
                     item { SettingsLabelRow("Clear data") { dialog = "clear" } }
@@ -753,7 +806,7 @@ fun SettingsScreen(
                 }
             }
             "Customization" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Homepage", settings.homepageUrl.ifBlank { null }) {
                         homepageDraft = settings.homepageUrl; dialog = "homepage"
                     } }
@@ -768,7 +821,7 @@ fun SettingsScreen(
                 }
             }
             "Privacy" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Do not track", if (settings.doNotTrack) "On" else null) {
                         onSettingsChange { it.copy(doNotTrack = !it.doNotTrack) }
                     } }
@@ -783,7 +836,7 @@ fun SettingsScreen(
                 }
             }
             "Advanced" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Save data", "Enable data-savings mode on compatible websites") {
                         toast("Data saver is controlled by the website")
                     } }
@@ -814,13 +867,13 @@ fun SettingsScreen(
                 }
             }
             "Scripts" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Userscripts", "No scripts installed") { toast("Script support is not available") } }
                     item { Spacer(Modifier.height(24.dp)) }
                 }
             }
             "About" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Jump", "Version 1.0.0") { onAbout() } }
                     item { SettingsLabelRow("Open source licenses") { toast("MIT License") } }
                     item { SettingsLabelRow("Terms of use") { toast("Personal and educational use") } }
@@ -939,8 +992,8 @@ private fun SettingsLabelRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 22.5.dp),
+            .pressable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 21.125.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -1016,7 +1069,7 @@ fun SearchField(
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChromeIcon(JumpIcons.Search, null, size = 18, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChromeIcon(ReferenceIcons.Search, null, size = 18, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
@@ -1035,7 +1088,7 @@ fun SearchField(
         }
         if (query.isNotEmpty()) {
             Box(Modifier.size(30.dp).clickable { onQuery("") }, contentAlignment = Alignment.Center) {
-                ChromeIcon(JumpIcons.Close, null, size = 15)
+                ChromeIcon(ReferenceIcons.Close, null, size = 15)
             }
         }
     }

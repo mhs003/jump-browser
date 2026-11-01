@@ -97,10 +97,10 @@ fun TitleBar(
 ) {
     val isHome = tab?.isHome != false
     val leftIcon = when {
-        isHome -> JumpIcons.Search
-        tab?.incognito == true && tab.secure -> JumpIcons.Incognito
-        tab?.secure == true -> JumpIcons.Secure
-        else -> JumpIcons.Search
+        isHome -> ReferenceIcons.Search
+        tab?.incognito == true && tab.secure -> ReferenceIcons.Incognito
+        tab?.secure == true -> ReferenceIcons.Secure
+        else -> ReferenceIcons.Search
     }
     Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
         ChromeButton(
@@ -126,9 +126,9 @@ fun TitleBar(
             )
         }
         val rightIcon = when {
-            isHome -> JumpIcons.Scanner
-            tab?.loading == true -> JumpIcons.Close
-            else -> JumpIcons.Refresh
+            isHome -> ReferenceIcons.Scanner
+            tab?.loading == true -> ReferenceIcons.Close
+            else -> ReferenceIcons.Refresh
         }
         ChromeButton(
             icon = rightIcon,
@@ -166,7 +166,7 @@ fun AddressBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            ChromeIcon(JumpIcons.Search, "Search", size = 22)
+            ChromeIcon(ReferenceIcons.Search, "Search", size = 22)
         }
         Box(
             Modifier.weight(1f).fillMaxHeight(),
@@ -193,20 +193,20 @@ fun AddressBar(
         }
         if (value.text.isNotEmpty()) {
             ChromeButton(
-                icon = JumpIcons.Close,
+                icon = ReferenceIcons.Close,
                 contentDescription = "Clear",
                 size = 22,
                 onClick = { onValueChange(TextFieldValue("", selection = TextRange(0))) },
             )
         }
         ChromeButton(
-            icon = JumpIcons.Expand,
+            icon = ReferenceIcons.Expand,
             contentDescription = "Expand address bar",
             size = 22,
             onClick = onExpand,
         )
         ChromeButton(
-            icon = JumpIcons.Forward,
+            icon = ReferenceIcons.Forward,
             contentDescription = "Go",
             size = 22,
             onClick = onSubmit,
@@ -266,7 +266,11 @@ fun BottomBar(
     onForward: () -> Unit,
     onHome: () -> Unit,
     onTabs: () -> Unit,
+    onNewTab: () -> Unit,
     onMenu: () -> Unit,
+    onMenuLong: () -> Unit,
+    onBackLong: () -> Unit,
+    onForwardLong: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val canBack = tab?.canGoBack == true
@@ -279,16 +283,16 @@ fun BottomBar(
             .height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BottomSlot(JumpIcons.Back, "Go back", canBack, onBack)
-        BottomSlot(JumpIcons.Forward, "Go forward", canForward, onForward)
-        BottomSlot(JumpIcons.Home, "Home", true, onHome)
+        BottomSlot(ReferenceIcons.Back, "Go back", canBack, onBack, onBackLong)
+        BottomSlot(ReferenceIcons.Forward, "Go forward", canForward, onForward, onForwardLong)
+        BottomSlot(ReferenceIcons.Home, "Home", true, onHome)
         Box(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .combinedClickable(
                     onClick = onTabs,
-                    onLongClick = onTabs,
+                    onLongClick = onNewTab,
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -298,7 +302,7 @@ fun BottomBar(
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
-        BottomSlot(JumpIcons.Menu, "Menu", true, onMenu)
+        BottomSlot(ReferenceIcons.Menu, "Menu", true, onMenu, onMenuLong)
     }
 }
 
@@ -308,6 +312,7 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
     description: String,
     enabled: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -318,11 +323,12 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
             .padding(horizontal = 0.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(if (pressed && enabled) com.jump.browser.ui.theme.JumpPressed else Color.Transparent)
-            .clickable(
+            .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
                 onClick = onClick,
+                onLongClick = onLongClick,
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -330,7 +336,7 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
             icon,
             contentDescription = description,
             tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -343,6 +349,7 @@ fun MenuOverlay(
     isDark: Boolean,
     imagesEnabled: Boolean,
     adBlocking: Boolean,
+    textZoom: Int,
     onAction: (MenuAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -373,6 +380,7 @@ fun MenuOverlay(
                     isDark = isDark,
                     imagesEnabled = imagesEnabled,
                     adBlocking = adBlocking,
+                    textZoom = textZoom,
                     onAction = onAction,
                     onDismiss = onDismiss,
                 )
@@ -387,44 +395,45 @@ private fun menuPages(
     isDark: Boolean,
     imagesEnabled: Boolean,
     adBlocking: Boolean,
+    textZoom: Int,
 ): List<List<MenuEntry>> {
     val incognitoNow = tab?.incognito == true
     val desktopNow = tab?.desktopMode == true
     val pageOne = listOf(
-        MenuEntry("Night mode", JumpIcons.Moon, MenuAction.NIGHT, isDark),
-        MenuEntry("Bookmarks", JumpIcons.Star, MenuAction.BOOKMARKS),
-        MenuEntry("History", JumpIcons.Clock, MenuAction.HISTORY),
-        MenuEntry("Downloads", JumpIcons.Download, MenuAction.DOWNLOADS),
-        MenuEntry("Incognito\nmode", JumpIcons.Incognito, MenuAction.INCOGNITO, incognitoNow),
-        MenuEntry("Share", JumpIcons.Share, MenuAction.SHARE),
-        MenuEntry(if (bookmarked) "Edit\nbookmark" else "Add\nbookmark", JumpIcons.BookmarkAdd, MenuAction.ADD_BOOKMARK, bookmarked),
-        MenuEntry("Desktop site", JumpIcons.Desktop, MenuAction.DESKTOP, desktopNow),
-        MenuEntry("Tools", JumpIcons.Tools, MenuAction.TOOLS),
-        MenuEntry("Settings", JumpIcons.Settings, MenuAction.SETTINGS),
+        MenuEntry("Night mode", ReferenceIcons.Moon, MenuAction.NIGHT, isDark),
+        MenuEntry("Bookmarks", ReferenceIcons.Bookmark, MenuAction.BOOKMARKS),
+        MenuEntry("History", ReferenceIcons.Clock, MenuAction.HISTORY),
+        MenuEntry("Downloads", ReferenceIcons.Download, MenuAction.DOWNLOADS),
+        MenuEntry("Incognito\nmode", ReferenceIcons.MenuIncognito, MenuAction.INCOGNITO, incognitoNow),
+        MenuEntry("Share", ReferenceIcons.Share, MenuAction.SHARE),
+        MenuEntry(if (bookmarked) "Edit\nbookmark" else "Add\nbookmark", ReferenceIcons.AddBookmark, MenuAction.ADD_BOOKMARK, bookmarked),
+        MenuEntry("Desktop site", ReferenceIcons.Desktop, MenuAction.DESKTOP, desktopNow),
+        MenuEntry("Tools", ReferenceIcons.Tools, MenuAction.TOOLS),
+        MenuEntry("Settings", ReferenceIcons.Settings, MenuAction.SETTINGS),
     )
     val pageTwo = listOf(
-        MenuEntry("Find in\npage", JumpIcons.Find, MenuAction.FIND),
-        MenuEntry("Save", JumpIcons.Save, MenuAction.SAVE_PAGE),
-        MenuEntry("Saved\npages", JumpIcons.Offline, MenuAction.SAVED_PAGES),
-        MenuEntry("Translate", JumpIcons.Translate, MenuAction.TRANSLATE),
-        MenuEntry("View\nsource", JumpIcons.Code, MenuAction.VIEW_SOURCE),
-        MenuEntry("Full-screen", JumpIcons.Fullscreen, MenuAction.FULLSCREEN),
-        MenuEntry("Show\nimages", JumpIcons.Image, MenuAction.SHOW_IMAGES, imagesEnabled),
-        MenuEntry("Resource\nsniffer", JumpIcons.Code, MenuAction.RESOURCE_SNIFFER),
-        MenuEntry("User-agent", JumpIcons.Desktop, MenuAction.USER_AGENT, desktopNow),
-        MenuEntry("Network\nlog", JumpIcons.Clock, MenuAction.NETWORK_LOG),
+        MenuEntry("Find in\npage", ReferenceIcons.Find, MenuAction.FIND),
+        MenuEntry("Save", ReferenceIcons.Save, MenuAction.SAVE_PAGE),
+        MenuEntry("Saved\npages", ReferenceIcons.SavedPages, MenuAction.SAVED_PAGES),
+        MenuEntry("Translate", ReferenceIcons.Translate, MenuAction.TRANSLATE),
+        MenuEntry("View\nsource", ReferenceIcons.ViewSource, MenuAction.VIEW_SOURCE),
+        MenuEntry("Full-screen", ReferenceIcons.Fullscreen, MenuAction.FULLSCREEN),
+        MenuEntry("Show\nimages", ReferenceIcons.ShowImages, MenuAction.SHOW_IMAGES, imagesEnabled),
+        MenuEntry("Resource\nsniffer", ReferenceIcons.Resource, MenuAction.RESOURCE_SNIFFER),
+        MenuEntry("User-agent", ReferenceIcons.UserAgent, MenuAction.USER_AGENT, desktopNow),
+        MenuEntry("Network\nlog", ReferenceIcons.Network, MenuAction.NETWORK_LOG),
     )
     val pageThree = listOf(
-        MenuEntry("Scan QR\ncode", JumpIcons.Scanner, MenuAction.SCAN_QR),
-        MenuEntry("Add to\nhome", JumpIcons.AddHome, MenuAction.ADD_HOME),
-        MenuEntry("Read\naloud", JumpIcons.Speaker, MenuAction.READ_ALOUD),
-        MenuEntry("AI", JumpIcons.Sparkle, MenuAction.AI),
-        MenuEntry("Orientation", JumpIcons.Rotate, MenuAction.ORIENTATION),
-        MenuEntry("Ad\nblocking", JumpIcons.Block, MenuAction.AD_BLOCK, adBlocking),
-        MenuEntry("Mark as\nad", JumpIcons.Flag, MenuAction.MARK_AD),
-        MenuEntry("Text size", JumpIcons.TextSize, MenuAction.TEXT_SIZE),
-        MenuEntry("Clear data", JumpIcons.Trash, MenuAction.CLEAR_DATA),
-        MenuEntry("Customize\nmenu", JumpIcons.Grid, MenuAction.CUSTOMIZE_MENU),
+        MenuEntry("Scan QR\ncode", ReferenceIcons.QrScan, MenuAction.SCAN_QR),
+        MenuEntry("Add to\nhome", ReferenceIcons.AddHome, MenuAction.ADD_HOME),
+        MenuEntry("Read\naloud", ReferenceIcons.ReadAloud, MenuAction.READ_ALOUD),
+        MenuEntry("AI", ReferenceIcons.Ai, MenuAction.AI),
+        MenuEntry("Orientation", ReferenceIcons.Orientation, MenuAction.ORIENTATION),
+        MenuEntry("Ad\nblocking", ReferenceIcons.AdBlock, MenuAction.AD_BLOCK, adBlocking),
+        MenuEntry("Mark as\nad", ReferenceIcons.MarkAd, MenuAction.MARK_AD),
+        MenuEntry("Text size", ReferenceIcons.TextSize, MenuAction.TEXT_SIZE, textZoom != 100),
+        MenuEntry("Clear data", ReferenceIcons.ClearData, MenuAction.CLEAR_DATA),
+        MenuEntry("Customize\nmenu", ReferenceIcons.CustomizeMenu, MenuAction.CUSTOMIZE_MENU),
     )
     return listOf(pageOne, pageTwo, pageThree)
 }
@@ -436,11 +445,12 @@ private fun MenuSheetContent(
     isDark: Boolean,
     imagesEnabled: Boolean,
     adBlocking: Boolean,
+    textZoom: Int,
     onAction: (MenuAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val pages = remember(tab, bookmarked, isDark, imagesEnabled, adBlocking) {
-        menuPages(tab, bookmarked, isDark, imagesEnabled, adBlocking)
+    val pages = remember(tab, bookmarked, isDark, imagesEnabled, adBlocking, textZoom) {
+        menuPages(tab, bookmarked, isDark, imagesEnabled, adBlocking, textZoom)
     }
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
@@ -484,10 +494,8 @@ private fun MenuSheetContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 pages.indices.forEach { index ->
-                    Box(Modifier.padding(horizontal = 4.dp)) {
-                        Dot(selected = pagerState.currentPage == index) {
-                            scope.launch { pagerState.animateScrollToPage(index) }
-                        }
+                    Dot(selected = pagerState.currentPage == index) {
+                        scope.launch { pagerState.animateScrollToPage(index) }
                     }
                 }
             }
@@ -498,9 +506,9 @@ private fun MenuSheetContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.weight(1f))
-                ChromeButton(JumpIcons.Power, "Exit") { onAction(MenuAction.EXIT) }
+                ChromeButton(ReferenceIcons.Power, "Exit") { onAction(MenuAction.EXIT) }
                 Spacer(Modifier.width(24.dp))
-                ChromeButton(JumpIcons.ChevronDown, "Close menu", onClick = onDismiss)
+                ChromeButton(ReferenceIcons.ChevronDown, "Close menu", onClick = onDismiss)
                 Spacer(Modifier.width(8.dp))
             }
         }
@@ -560,13 +568,13 @@ fun TabPopup(
                                     fontSize = 16.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    color = if (tab.id == activeId) JumpAccent else MaterialTheme.colorScheme.onBackground,
+                                    color = if (tab.id == activeId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                                 )
                                 Box(
                                     Modifier.size(48.dp).clickable { onClose(tab.id) },
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    ChromeIcon(JumpIcons.Close, "Close tab", size = 20)
+                                    ChromeIcon(ReferenceIcons.Close, "Close tab", size = 20)
                                 }
                             }
                         }
@@ -577,7 +585,7 @@ fun TabPopup(
                                 .clickable { onNewTab() },
                             contentAlignment = Alignment.Center,
                         ) {
-                            ChromeIcon(JumpIcons.Plus, "New tab", size = 24)
+                            ChromeIcon(ReferenceIcons.Plus, "New tab", size = 24)
                         }
                     }
                 }

@@ -55,7 +55,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -99,6 +101,7 @@ fun BrowserRoot(
     val active = controller.activeTab
     val keyboard = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val navInsetPx = WindowInsets.navigationBars.getBottom(density)
     val bottomInsetPx = navInsetPx + with(density) { 48.dp.roundToPx() }
@@ -162,15 +165,26 @@ fun BrowserRoot(
     }
 
     fun startAddressEditing() {
-        if (active?.isHome == true) homeDip = true
-        val text = active?.url ?: ""
-        address = androidx.compose.ui.text.input.TextFieldValue(
-            text = text,
-            selection = androidx.compose.ui.text.TextRange(0, text.length),
-        )
-        editing = true
-        showMenu = false
-        showTabs = false
+        val isHome = active?.isHome == true
+        fun open() {
+            val text = active?.url ?: ""
+            address = androidx.compose.ui.text.input.TextFieldValue(
+                text = text,
+                selection = androidx.compose.ui.text.TextRange(0, text.length),
+            )
+            editing = true
+            showMenu = false
+            showTabs = false
+        }
+        if (isHome) {
+            homeDip = true
+            scope.launch {
+                kotlinx.coroutines.delay(120)
+                open()
+                kotlinx.coroutines.delay(80)
+                homeDip = false
+            }
+        } else open()
     }
 
     fun closeEditing() {
@@ -313,14 +327,7 @@ fun BrowserRoot(
                     ErrorPage(active.errorText, onRetry = { controller.reload() })
                 }
 
-                if (editing) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(JumpScrim)
-                            .clickable { closeEditing() },
-                    )
-                }
+                AddressScrim(visible = editing, onClick = { closeEditing() })
 
                 AddressSuggestionsOverlay(
                     visible = editing && active != null,
@@ -359,6 +366,10 @@ fun BrowserRoot(
                 onBack = { controller.goBack() },
                 onForward = { controller.goForward() },
                 onHome = { closeAllOverlays(); controller.goHome() },
+                onNewTab = { controller.newHomeTab() },
+                onMenuLong = { openPage(LibraryPage.SETTINGS) },
+                onBackLong = { controller.scrollToTop() },
+                onForwardLong = { controller.scrollToBottom() },
                 onTabs = {
                     if (showTabs) showTabs = false
                     else {
@@ -385,6 +396,7 @@ fun BrowserRoot(
             isDark = dark,
             imagesEnabled = settings.loadImages,
             adBlocking = settings.adBlock,
+            textZoom = settings.textZoom,
             onDismiss = { showMenu = false },
             onAction = { action ->
                 showMenu = false
@@ -574,18 +586,6 @@ fun BrowserRoot(
         }
 
         AnimVis(
-            visible = reader != null,
-            enter = slideInHorizontally(tween(230)) { it / 4 } + fadeIn(tween(160)),
-            exit = slideOutHorizontally(tween(190)) { it / 4 } + fadeOut(tween(120)),
-        ) {
-            reader?.let {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    ReaderScreen(it) { reader = null }
-                }
-            }
-        }
-
-        AnimVis(
             visible = source != null,
             enter = slideInHorizontally(tween(230)) { it / 4 } + fadeIn(tween(160)),
             exit = slideOutHorizontally(tween(190)) { it / 4 } + fadeOut(tween(120)),
@@ -677,7 +677,7 @@ fun BrowserRoot(
                             )
                         }
                         ChromeButton(
-                            icon = JumpIcons.Clock,
+                            icon = ReferenceIcons.Clock,
                             contentDescription = "History for this site",
                             size = 22,
                             onClick = {
@@ -687,7 +687,7 @@ fun BrowserRoot(
                             },
                         )
                         ChromeButton(
-                            icon = JumpIcons.Grid,
+                            icon = ReferenceIcons.CustomizeMenu,
                             contentDescription = "Site configuration",
                             size = 22,
                             onClick = {
@@ -799,6 +799,22 @@ fun BrowserRoot(
 }
 
 @Composable
+private fun AddressScrim(visible: Boolean, onClick: () -> Unit) {
+    AnimVis(
+        visible = visible,
+        enter = fadeIn(tween(240)),
+        exit = fadeOut(tween(240)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(JumpScrim)
+                .clickable { onClick() },
+        )
+    }
+}
+
+@Composable
 private fun AddressSuggestionsOverlay(
     visible: Boolean,
     active: TabInfo?,
@@ -833,12 +849,12 @@ private fun SuggestionDropdown(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
-        shadowElevation = 6.dp,
+        shadowElevation = 0.dp,
     ) {
         Column {
             if (current != null) {
                 SuggestionRow(
-                    icon = JumpIcons.Tabs,
+                    icon = ReferenceIcons.Tabs,
                     title = current.title.ifBlank { "Homepage" },
                     subtitle = current.url,
                     onClick = onCurrent,
@@ -849,9 +865,9 @@ private fun SuggestionDropdown(
                 items(suggestions) { suggestion ->
                     SuggestionRow(
                         icon = when (suggestion.kind) {
-                            SuggestionKind.BOOKMARK -> JumpIcons.Star
-                            SuggestionKind.HISTORY -> JumpIcons.Clock
-                            else -> JumpIcons.Search
+                            SuggestionKind.BOOKMARK -> ReferenceIcons.BookmarkSuggestion
+                            SuggestionKind.HISTORY -> ReferenceIcons.HistorySuggestion
+                            else -> ReferenceIcons.Search
                         },
                         title = suggestion.text,
                         subtitle = suggestion.subtitle,
@@ -874,7 +890,7 @@ private fun SuggestionRow(
         Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .clickable { onClick() },
+            .pressable { onClick() },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
@@ -899,7 +915,7 @@ private fun SuggestionRow(
             }
         }
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            ChromeIcon(JumpIcons.OpenArrow, null, size = 22)
+            ChromeIcon(ReferenceIcons.OpenArrow, null, size = 22)
         }
     }
 }
@@ -912,7 +928,7 @@ private fun SiteInfoAction(label: String, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .pressable { onClick() }
             .padding(horizontal = 16.dp, vertical = 13.dp),
     )
 }
@@ -955,16 +971,16 @@ private fun ContextMenuOverlay(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (menu.linkUrl != null) {
-                        ContextRow(JumpIcons.Plus, "Open in new tab", onOpenNew)
-                        ContextRow(JumpIcons.Tabs, "Open in background", onOpenBackground)
+                        ContextRow(ReferenceIcons.Plus, "Open in new tab", onOpenNew)
+                        ContextRow(ReferenceIcons.Tabs, "Open in background", onOpenBackground)
                         ContextRow(JumpIcons.Copy, "Copy link", onCopy)
-                        ContextRow(JumpIcons.Share, "Share link", onShare)
+                        ContextRow(ReferenceIcons.Share, "Share link", onShare)
                     }
                     if (menu.imageUrl != null) {
-                        ContextRow(JumpIcons.Image, "Open image", onOpenNew)
-                        ContextRow(JumpIcons.Download, "Download image", onDownload)
+                        ContextRow(ReferenceIcons.ShowImages, "Open image", onOpenNew)
+                        ContextRow(ReferenceIcons.Download, "Download image", onDownload)
                         ContextRow(JumpIcons.Copy, "Copy image address", onCopy)
-                        ContextRow(JumpIcons.Share, "Share image", onShare)
+                        ContextRow(ReferenceIcons.Share, "Share image", onShare)
                     }
                     Spacer(Modifier.height(10.dp))
                 }
@@ -982,7 +998,7 @@ private fun ContextRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .pressable { onClick() }
             .padding(horizontal = 20.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1008,9 +1024,9 @@ private fun ToolsDialog(
         text = {
             Column {
                 ToolRow(JumpIcons.Reader, "Reader mode", onReader)
-                ToolRow(JumpIcons.Find, "Find in page", onFind)
+                ToolRow(ReferenceIcons.Find, "Find in page", onFind)
                 ToolRow(JumpIcons.Copy, "View source", onSource)
-                ToolRow(JumpIcons.Translate, "Translate", onTranslate)
+                ToolRow(ReferenceIcons.Translate, "Translate", onTranslate)
                 ToolRow(JumpIcons.Printer, "Print", onPrint)
                 ToolRow(JumpIcons.Info, "Page info", onPageInfo)
             }
