@@ -721,9 +721,11 @@ fun BrowserRoot(
         }
 
         if (titleMenu) {
+            LaunchedEffect(Unit) { showMenu = false; showTabs = false }
             Box(
                 Modifier
                     .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.32f))
                     .clickable(
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,

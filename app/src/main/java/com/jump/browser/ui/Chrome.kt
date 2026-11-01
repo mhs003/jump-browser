@@ -177,8 +177,7 @@ fun TitleActionPopup(
     Row(
         modifier
             .height(48.dp)
-            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(17.dp))
-            .border(0.5.dp, Color(0x30808080), RoundedCornerShape(17.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(17.dp))
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
