@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -57,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -162,7 +164,7 @@ fun AddressBar(
         Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.background),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
@@ -189,6 +191,19 @@ fun AddressBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
+                decorationBox = { inner ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (value.text.isEmpty()) {
+                            Text(
+                                "Search",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                            )
+                        }
+                        inner()
+                    }
+                },
             )
         }
         if (value.text.isNotEmpty()) {
@@ -211,6 +226,88 @@ fun AddressBar(
             size = 22,
             onClick = onSubmit,
         )
+    }
+}
+
+@Composable
+fun FullScreenAddressBar(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    onSubmit: () -> Unit,
+    onCollapse: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .imePadding(),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp),
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Go,
+                ),
+                keyboardActions = KeyboardActions(onGo = { onSubmit() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth()) {
+                        if (value.text.isEmpty()) {
+                            Text(
+                                "Search",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
+                        inner()
+                    }
+                },
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .jumpClickable { onCollapse() },
+                contentAlignment = Alignment.Center,
+            ) {
+                ChromeIcon(
+                    ReferenceIcons.Expand,
+                    "Collapse address bar",
+                    size = 22,
+                    modifier = Modifier.rotate(180f),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            ChromeButton(
+                icon = ReferenceIcons.Forward,
+                contentDescription = "Go",
+                size = 22,
+                onClick = onSubmit,
+            )
+        }
     }
 }
 
@@ -275,7 +372,6 @@ fun BottomBar(
 ) {
     val canBack = tab?.canGoBack == true
     val canForward = tab?.canGoForward == true
-    val activeIndex = tabs.indexOfFirst { it.id == tab?.id }.coerceAtLeast(0)
     Row(
         modifier
             .fillMaxWidth()
@@ -286,11 +382,17 @@ fun BottomBar(
         BottomSlot(ReferenceIcons.Back, "Go back", canBack, onBack, onBackLong)
         BottomSlot(ReferenceIcons.Forward, "Go forward", canForward, onForward, onForwardLong)
         BottomSlot(ReferenceIcons.Home, "Home", true, onHome)
+        val countInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         Box(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
+                .clip(RoundedCornerShape(18.dp))
                 .combinedClickable(
+                    interactionSource = countInteraction,
+                    indication = androidx.compose.material3.ripple(
+                        color = com.jump.browser.ui.theme.JumpRipple,
+                    ),
                     onClick = onTabs,
                     onLongClick = onNewTab,
                 ),
@@ -298,7 +400,6 @@ fun BottomBar(
         ) {
             TabCountBadge(
                 count = tabs.size,
-                index = activeIndex,
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -315,17 +416,16 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
     onLongClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     Box(
         Modifier
             .weight(1f)
             .fillMaxHeight()
-            .padding(horizontal = 0.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(if (pressed && enabled) com.jump.browser.ui.theme.JumpPressed else Color.Transparent)
             .combinedClickable(
                 interactionSource = interaction,
-                indication = null,
+                indication = androidx.compose.material3.ripple(
+                    color = com.jump.browser.ui.theme.JumpRipple,
+                ),
                 enabled = enabled,
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -363,7 +463,10 @@ fun MenuOverlay(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.20f))
-                .clickable { onDismiss() },
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onDismiss() },
         ) {
             AnimatedVisibility(
                 visible = visible,
@@ -533,7 +636,10 @@ fun TabPopup(
                 .fillMaxSize()
                 .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
                 .background(Color.Black.copy(alpha = 0.25f))
-                .clickable { onDismiss() },
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onDismiss() },
         ) {
             AnimatedVisibility(
                 visible = visible,
@@ -556,7 +662,7 @@ fun TabPopup(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
-                                    .clickable { onSelect(tab.id) },
+                                    .jumpClickable(androidx.compose.ui.graphics.RectangleShape) { onSelect(tab.id) },
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
@@ -571,7 +677,9 @@ fun TabPopup(
                                     color = if (tab.id == activeId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                                 )
                                 Box(
-                                    Modifier.size(48.dp).clickable { onClose(tab.id) },
+                                    Modifier.size(48.dp).jumpClickable {
+                                        onClose(tab.id)
+                                    },
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     ChromeIcon(ReferenceIcons.Close, "Close tab", size = 20)
@@ -582,7 +690,7 @@ fun TabPopup(
                             Modifier
                                 .fillMaxWidth()
                                 .height(50.dp)
-                                .clickable { onNewTab() },
+                                .jumpClickable(androidx.compose.ui.graphics.RectangleShape) { onNewTab() },
                             contentAlignment = Alignment.Center,
                         ) {
                             ChromeIcon(ReferenceIcons.Plus, "New tab", size = 24)

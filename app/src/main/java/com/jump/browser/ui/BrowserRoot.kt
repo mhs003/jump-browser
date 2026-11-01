@@ -8,7 +8,6 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.widget.FrameLayout
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility as AnimVis
 import androidx.compose.animation.core.animateFloatAsState
@@ -46,7 +45,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -64,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.jump.browser.ui.JumpToast
 import com.jump.browser.MainActivity
 import com.jump.browser.browser.BrowserController
 import com.jump.browser.browser.ReaderData
@@ -107,11 +107,13 @@ fun BrowserRoot(
     val bottomInsetPx = navInsetPx + with(density) { 48.dp.roundToPx() }
 
     var editing by remember { mutableStateOf(false) }
+    var fullScreenAddress by remember { mutableStateOf(false) }
     var address by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
     var suggestions by remember { mutableStateOf(emptyList<SearchSuggestion>()) }
     var showMenu by remember { mutableStateOf(false) }
     var showTabs by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(LibraryPage.NONE) }
+    var shownPage by remember { mutableStateOf(LibraryPage.NONE) }
     var recordsTab by remember { mutableIntStateOf(0) }
     var reader by remember { mutableStateOf<ReaderData?>(null) }
     var source by remember { mutableStateOf<String?>(null) }
@@ -154,6 +156,7 @@ fun BrowserRoot(
         showMenu = false
         showTabs = false
         editing = false
+        fullScreenAddress = false
         qrScreen = false
         toolsDialog = false
         keyboard?.hide()
@@ -162,6 +165,7 @@ fun BrowserRoot(
     fun openPage(target: LibraryPage) {
         closeAllOverlays()
         page = target
+        if (target != LibraryPage.NONE) shownPage = target
     }
 
     fun startAddressEditing() {
@@ -173,6 +177,7 @@ fun BrowserRoot(
                 selection = androidx.compose.ui.text.TextRange(0, text.length),
             )
             editing = true
+            fullScreenAddress = false
             showMenu = false
             showTabs = false
         }
@@ -189,6 +194,7 @@ fun BrowserRoot(
 
     fun closeEditing() {
         editing = false
+        fullScreenAddress = false
         keyboard?.hide()
     }
 
@@ -227,6 +233,7 @@ fun BrowserRoot(
             reader != null -> reader = null
             source != null -> source = null
             findVisible -> closeFind()
+            fullScreenAddress -> fullScreenAddress = false
             editing -> closeEditing()
             active?.canGoBack == true -> controller.goBack()
             else -> {
@@ -234,7 +241,7 @@ fun BrowserRoot(
                 if (now - lastBack < 2000) onExit()
                 else {
                     lastBack = now
-                    Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                    JumpToast.show(context, "Press back again to exit")
                 }
             }
         }
@@ -260,8 +267,30 @@ fun BrowserRoot(
         )
     }
 
+    val pageProgress by animateFloatAsState(
+        targetValue = if (page != LibraryPage.NONE) 1f else 0f,
+        animationSpec = tween(
+            220,
+            easing = androidx.compose.animation.core.Easing { t -> t * t * (3f - 2f * t) },
+        ),
+        label = "library-page",
+    )
+    val screenWidthPx = with(density) {
+        LocalConfiguration.current.screenWidthDp.dp.toPx()
+    }
+    LaunchedEffect(page) {
+        if (page != LibraryPage.NONE) shownPage = page
+    }
+    LaunchedEffect(pageProgress) {
+        if (page == LibraryPage.NONE && pageProgress == 0f) shownPage = LibraryPage.NONE
+    }
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationX = -screenWidthPx * 0.30f * pageProgress },
+        ) {
             Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
             TopChrome(
                 editing = editing,
@@ -271,7 +300,7 @@ fun BrowserRoot(
                 onOpenAddress = { startAddressEditing() },
                 onCloseAddress = { closeEditing() },
                 onSubmitAddress = { submitAddress() },
-                onExpandAddress = { keyboard?.hide() },
+                onExpandAddress = { fullScreenAddress = true },
                 onLeftClick = { siteInfoDialog = true },
                 onRightClick = {
                     if (active?.isHome != false) qrScreen = true
@@ -327,12 +356,13 @@ fun BrowserRoot(
                     ErrorPage(active.errorText, onRetry = { controller.reload() })
                 }
 
-                AddressScrim(visible = editing, onClick = { closeEditing() })
+                AddressScrim(visible = editing && !fullScreenAddress, onClick = { closeEditing() })
 
                 AddressSuggestionsOverlay(
-                    visible = editing && active != null,
+                    visible = editing && !fullScreenAddress && active != null,
                     active = active,
                     suggestions = suggestions,
+                    showCurrent = address.text.isBlank() && active?.isHome != true,
                     modifier = Modifier.align(Alignment.TopCenter),
                     onCurrent = { closeEditing() },
                     onPick = { suggestion ->
@@ -414,14 +444,14 @@ fun BrowserRoot(
                     MenuAction.SHARE -> controller.shareUrl(active?.url, active?.title)
                     MenuAction.ADD_BOOKMARK -> {
                         val url = active?.url
-                        if (url == null) Toast.makeText(context, "Open a page first", Toast.LENGTH_SHORT).show()
+                        if (url == null) JumpToast.show(context, "Open a page first")
                         else {
                             val existing = bookmarks.firstOrNull { it.url == url }
                             if (existing != null) editingBookmark = existing else controller.toggleBookmark()
                         }
                     }
                     MenuAction.DESKTOP -> {
-                        if (active?.url == null) Toast.makeText(context, "Open a page first", Toast.LENGTH_SHORT).show()
+                        if (active?.url == null) JumpToast.show(context, "Open a page first")
                         else controller.setDesktopMode(active.desktopMode.not())
                     }
                     MenuAction.TOOLS -> toolsDialog = true
@@ -432,18 +462,18 @@ fun BrowserRoot(
                         findQuery = ""
                     }
                     MenuAction.READER -> controller.extractReader { data ->
-                        if (data == null) Toast.makeText(context, "Reader mode is not available for this page", Toast.LENGTH_SHORT).show()
+                        if (data == null) JumpToast.show(context, "Reader mode is not available for this page")
                         else reader = data
                     }
                     MenuAction.SAVE_PAGE -> controller.savePage()
                     MenuAction.ADD_HOME -> addShortcut(context, active?.title ?: "Jump", active?.url)
                     MenuAction.TRANSLATE -> {
                         val url = active?.url
-                        if (url == null) Toast.makeText(context, "Open a page first", Toast.LENGTH_SHORT).show()
+                        if (url == null) JumpToast.show(context, "Open a page first")
                         else controller.loadUrl("https://translate.google.com/?sl=auto&tl=en&u=" + UrlUtils.encodeQuery(url))
                     }
                     MenuAction.VIEW_SOURCE -> controller.viewSource { html ->
-                        if (html.isBlank()) Toast.makeText(context, "Source is not available", Toast.LENGTH_SHORT).show()
+                        if (html.isBlank()) JumpToast.show(context, "Source is not available")
                         else {
                             sourceTitle = active?.title ?: "View source"
                             source = html
@@ -456,25 +486,25 @@ fun BrowserRoot(
                         controller.applySettingsToAll()
                         controller.reload()
                     }
-                    MenuAction.RESOURCE_SNIFFER -> Toast.makeText(context, "Resource sniffer is not available", Toast.LENGTH_SHORT).show()
+                    MenuAction.RESOURCE_SNIFFER -> JumpToast.show(context, "Resource sniffer is not available")
                     MenuAction.USER_AGENT -> {
-                        if (active?.url == null) Toast.makeText(context, "Open a page first", Toast.LENGTH_SHORT).show()
+                        if (active?.url == null) JumpToast.show(context, "Open a page first")
                         else controller.setDesktopMode(active.desktopMode.not())
                     }
-                    MenuAction.NETWORK_LOG -> Toast.makeText(context, "Network log is empty", Toast.LENGTH_SHORT).show()
+                    MenuAction.NETWORK_LOG -> JumpToast.show(context, "Network log is empty")
                     MenuAction.SCAN_QR -> qrScreen = true
-                    MenuAction.READ_ALOUD -> Toast.makeText(context, "Read aloud is not available for this page", Toast.LENGTH_SHORT).show()
-                    MenuAction.AI -> Toast.makeText(context, "AI is not enabled", Toast.LENGTH_SHORT).show()
-                    MenuAction.ORIENTATION -> Toast.makeText(context, "Orientation follows the system", Toast.LENGTH_SHORT).show()
+                    MenuAction.READ_ALOUD -> JumpToast.show(context, "Read aloud is not available for this page")
+                    MenuAction.AI -> JumpToast.show(context, "AI is not enabled")
+                    MenuAction.ORIENTATION -> JumpToast.show(context, "Orientation follows the system")
                     MenuAction.AD_BLOCK -> {
                         container.settings.update { it.copy(adBlock = !it.adBlock) }
                         controller.applySettingsToAll()
                         controller.reload()
                     }
-                    MenuAction.MARK_AD -> Toast.makeText(context, "Ad rule added for this site", Toast.LENGTH_SHORT).show()
+                    MenuAction.MARK_AD -> JumpToast.show(context, "Ad rule added for this site")
                     MenuAction.TEXT_SIZE -> openPage(LibraryPage.SETTINGS)
                     MenuAction.CLEAR_DATA -> clearDataDialog = true
-                    MenuAction.CUSTOMIZE_MENU -> Toast.makeText(context, "Menu customization is not available", Toast.LENGTH_SHORT).show()
+                    MenuAction.CUSTOMIZE_MENU -> JumpToast.show(context, "Menu customization is not available")
                     MenuAction.PRINT -> controller.printPage()
                     MenuAction.PAGE_INFO -> siteInfoDialog = true
                     MenuAction.COPY_URL -> controller.copyUrl(active?.url)
@@ -542,13 +572,14 @@ fun BrowserRoot(
             }
         }
 
-        AnimVis(
-            visible = page != LibraryPage.NONE,
-            enter = slideInHorizontally(tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { (it * 0.30f).toInt() },
-            exit = slideOutHorizontally(tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { (it * 0.30f).toInt() },
-        ) {
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                when (page) {
+        if (shownPage != LibraryPage.NONE) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationX = screenWidthPx * (1f - pageProgress) },
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                when (shownPage) {
                     LibraryPage.RECORDS -> RecordsScreen(
                         initialTab = recordsTab,
                         bookmarks = bookmarks,
@@ -596,6 +627,18 @@ fun BrowserRoot(
                 }
             }
         }
+
+        if (editing && fullScreenAddress) {
+            FullScreenAddressBar(
+                value = address,
+                onValueChange = { address = it },
+                onSubmit = { submitAddress() },
+                onCollapse = { fullScreenAddress = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        JumpToastHost()
     }
 
     if (editingBookmark != null) {
@@ -617,7 +660,7 @@ fun BrowserRoot(
             onReader = {
                 toolsDialog = false
                 controller.extractReader { data ->
-                    if (data != null) reader = data else Toast.makeText(context, "Reader mode is not available", Toast.LENGTH_SHORT).show()
+                    if (data != null) reader = data else JumpToast.show(context, "Reader mode is not available")
                 }
             },
             onSource = {
@@ -643,7 +686,10 @@ fun BrowserRoot(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.20f))
-                .clickable { siteInfoDialog = false },
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { siteInfoDialog = false },
         ) {
             Surface(
                 Modifier
@@ -683,7 +729,7 @@ fun BrowserRoot(
                             onClick = {
                                 siteInfoDialog = false
                                 recordsTab = 1
-                                page = LibraryPage.RECORDS
+                                openPage(LibraryPage.RECORDS)
                             },
                         )
                         ChromeButton(
@@ -691,26 +737,26 @@ fun BrowserRoot(
                             contentDescription = "Site configuration",
                             size = 22,
                             onClick = {
-                                Toast.makeText(context, "Site configuration is not available", Toast.LENGTH_SHORT).show()
+                                JumpToast.show(context, "Site configuration is not available")
                             },
                         )
                     }
                     Spacer(Modifier.height(8.dp))
                     SiteInfoAction("View certificate") {
-                        Toast.makeText(context, if (tab?.secure == true) "Connection is secure" else "Connection is not secure", Toast.LENGTH_SHORT).show()
+                        JumpToast.show(context, if (tab?.secure == true) "Connection is secure" else "Connection is not secure")
                         siteInfoDialog = false
                     }
                     SiteInfoAction("View Cookies") {
-                        Toast.makeText(context, "No site cookies to display", Toast.LENGTH_SHORT).show()
+                        JumpToast.show(context, "No site cookies to display")
                         siteInfoDialog = false
                     }
                     SiteInfoAction("Site configuration") {
-                        Toast.makeText(context, "Site configuration is not available", Toast.LENGTH_SHORT).show()
+                        JumpToast.show(context, "Site configuration is not available")
                     }
                     SiteInfoAction("Show reader") {
                         siteInfoDialog = false
                         controller.extractReader { data ->
-                            if (data == null) Toast.makeText(context, "Reader mode is not available for this page", Toast.LENGTH_SHORT).show()
+                            if (data == null) JumpToast.show(context, "Reader mode is not available for this page")
                             else reader = data
                         }
                     }
@@ -732,7 +778,7 @@ fun BrowserRoot(
                     Text("Kotlin · Jetpack Compose · Android WebView", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text("Close") } },
+            confirmButton = { JumpDialogButton(onClick = { aboutDialog = false }) { Text("Close") } },
         )
     }
 
@@ -748,7 +794,7 @@ fun BrowserRoot(
                     Text("• Use the menu for reader mode, find in page and more.", fontSize = 13.sp)
                 }
             },
-            confirmButton = { TextButton(onClick = { helpDialog = false }) { Text("Got it") } },
+            confirmButton = { JumpDialogButton(onClick = { helpDialog = false }) { Text("Got it") } },
         )
     }
 
@@ -758,13 +804,13 @@ fun BrowserRoot(
             title = { Text("Clear data") },
             text = { Text("Clear history, cookies and cached files?") },
             confirmButton = {
-                TextButton(onClick = {
+                JumpDialogButton(onClick = {
                     controller.clearBrowsingData(true, true, true)
                     clearDataDialog = false
-                    Toast.makeText(context, "Browsing data cleared", Toast.LENGTH_SHORT).show()
+                    JumpToast.show(context, "Browsing data cleared")
                 }) { Text("Clear") }
             },
-            dismissButton = { TextButton(onClick = { clearDataDialog = false }) { Text("Cancel") } },
+            dismissButton = { JumpDialogButton(onClick = { clearDataDialog = false }) { Text("Cancel") } },
         )
     }
 
@@ -776,24 +822,22 @@ fun BrowserRoot(
             text = {
                 Column {
                     Text("All open tabs will be deleted and cannot be restored, are you sure to you want to exit app?")
-                    Spacer(Modifier.height(14.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.Checkbox(
-                            checked = dontAsk,
-                            onCheckedChange = { dontAsk = it },
-                        )
-                        Text("Don't remind me again", fontSize = 14.sp)
-                    }
+                    Spacer(Modifier.height(12.dp))
+                    JumpCheckbox(
+                        checked = dontAsk,
+                        onCheckedChange = { dontAsk = it },
+                        label = "Don't remind me again",
+                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                JumpDialogButton(onClick = {
                     if (dontAsk) container.settings.update { it.copy(confirmExit = false) }
                     exitDialog = false
                     onExit()
                 }) { Text("Exit") }
             },
-            dismissButton = { TextButton(onClick = { exitDialog = false }) { Text("Cancel") } },
+            dismissButton = { JumpDialogButton(onClick = { exitDialog = false }) { Text("Cancel") } },
         )
     }
 }
@@ -809,7 +853,10 @@ private fun AddressScrim(visible: Boolean, onClick: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .background(JumpScrim)
-                .clickable { onClick() },
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onClick() },
         )
     }
 }
@@ -819,6 +866,7 @@ private fun AddressSuggestionsOverlay(
     visible: Boolean,
     active: TabInfo?,
     suggestions: List<SearchSuggestion>,
+    showCurrent: Boolean,
     modifier: Modifier = Modifier,
     onCurrent: () -> Unit,
     onPick: (SearchSuggestion) -> Unit,
@@ -831,6 +879,7 @@ private fun AddressSuggestionsOverlay(
     ) {
         SuggestionDropdown(
             current = active,
+            showCurrent = showCurrent,
             suggestions = suggestions,
             onCurrent = onCurrent,
             onPick = onPick,
@@ -841,6 +890,7 @@ private fun AddressSuggestionsOverlay(
 @Composable
 private fun SuggestionDropdown(
     current: TabInfo?,
+    showCurrent: Boolean,
     suggestions: List<SearchSuggestion>,
     onCurrent: () -> Unit,
     onPick: (SearchSuggestion) -> Unit,
@@ -852,10 +902,11 @@ private fun SuggestionDropdown(
         shadowElevation = 0.dp,
     ) {
         Column {
-            if (current != null) {
+            if (current != null && showCurrent) {
                 SuggestionRow(
-                    icon = ReferenceIcons.Tabs,
-                    title = current.title.ifBlank { "Homepage" },
+                    icon = null,
+                    tab = current,
+                    title = current.title.ifBlank { "Page" },
                     subtitle = current.url,
                     onClick = onCurrent,
                 )
@@ -869,6 +920,7 @@ private fun SuggestionDropdown(
                             SuggestionKind.HISTORY -> ReferenceIcons.HistorySuggestion
                             else -> ReferenceIcons.Search
                         },
+                        tab = null,
                         title = suggestion.text,
                         subtitle = suggestion.subtitle,
                         onClick = { onPick(suggestion) },
@@ -881,7 +933,8 @@ private fun SuggestionDropdown(
 
 @Composable
 private fun SuggestionRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    tab: TabInfo?,
     title: String,
     subtitle: String?,
     onClick: () -> Unit,
@@ -894,7 +947,11 @@ private fun SuggestionRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            ChromeIcon(icon, null, size = 22)
+            if (tab != null) {
+                Favicon(tab, 24)
+            } else if (icon != null) {
+                ChromeIcon(icon, null, size = 22)
+            }
         }
         Column(Modifier.weight(1f).padding(start = 2.dp)) {
             Text(
@@ -948,14 +1005,20 @@ private fun ContextMenuOverlay(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.28f))
-                .clickable { onDismiss() },
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
             Surface(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .clickable { },
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                    ) { },
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             ) {
@@ -1031,7 +1094,7 @@ private fun ToolsDialog(
                 ToolRow(JumpIcons.Info, "Page info", onPageInfo)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { JumpDialogButton(onClick = onDismiss) { Text("Close") } },
     )
 }
 
@@ -1040,7 +1103,7 @@ private fun ToolRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .pressable { onClick() }
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1058,13 +1121,13 @@ private fun openDownload(context: Context, task: DownloadTask) {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }.onFailure {
-        Toast.makeText(context, "No app can open this file", Toast.LENGTH_SHORT).show()
+        JumpToast.show(context, "No app can open this file")
     }
 }
 
 private fun addShortcut(context: Context, title: String, url: String?) {
     if (url == null) {
-        Toast.makeText(context, "Open a page first", Toast.LENGTH_SHORT).show()
+        JumpToast.show(context, "Open a page first")
         return
     }
     runCatching {
@@ -1079,8 +1142,8 @@ private fun addShortcut(context: Context, title: String, url: String?) {
             )
             .build()
         manager.requestPinShortcut(shortcut, null)
-        Toast.makeText(context, "Shortcut requested", Toast.LENGTH_SHORT).show()
+        JumpToast.show(context, "Shortcut requested")
     }.onFailure {
-        Toast.makeText(context, "Could not create shortcut", Toast.LENGTH_SHORT).show()
+        JumpToast.show(context, "Could not create shortcut")
     }
 }
