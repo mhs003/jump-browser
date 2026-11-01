@@ -545,6 +545,7 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
 fun MenuOverlay(
     visible: Boolean,
     bottomInset: Int,
+    customOrder: List<String> = emptyList(),
     tab: TabInfo?,
     bookmarked: Boolean,
     isDark: Boolean,
@@ -581,6 +582,7 @@ fun MenuOverlay(
                     imagesEnabled = imagesEnabled,
                     adBlocking = adBlocking,
                     textZoom = textZoom,
+                    customOrder = customOrder,
                     onAction = onAction,
                     onDismiss = onDismiss,
                 )
@@ -646,11 +648,19 @@ private fun MenuSheetContent(
     imagesEnabled: Boolean,
     adBlocking: Boolean,
     textZoom: Int,
+    customOrder: List<String>,
     onAction: (MenuAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val pages = remember(tab, bookmarked, isDark, imagesEnabled, adBlocking, textZoom) {
-        menuPages(tab, bookmarked, isDark, imagesEnabled, adBlocking, textZoom)
+    val pages = remember(tab, bookmarked, isDark, imagesEnabled, adBlocking, textZoom, customOrder) {
+        val base = menuPages(tab, bookmarked, isDark, imagesEnabled, adBlocking, textZoom)
+        if (customOrder.isEmpty()) base
+        else {
+            val all = base.flatten()
+            val byLabel = all.associateBy { it.label.replace('\n', ' ') }
+            val ordered = customOrder.mapNotNull { byLabel[it] }
+            ordered.chunked(10).ifEmpty { base }
+        }
     }
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
