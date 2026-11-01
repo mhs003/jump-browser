@@ -1,1 +1,1 @@
-9a01b3fdeb316a86d9f6b3140e532bfc65b7d6934e3d353c817f29629b7ddf0c  dist/Jump-1.0.0.apk
+fdaa8be3dc98fb1f58968a7635f15f07e506ab0a1f1c4e9abee78ceb2b5f530c  dist/Jump-1.0.0.apk
