@@ -1031,7 +1031,8 @@ fun SettingsScreen(
     if (dialog == "engine") {
         ChoiceDialog(
             title = "Search engine",
-            options = SearchEngine.all.map { it.name to it.id },
+            options = listOf("Google" to "google", "Baidu" to "baidu", "Bing" to "bing",
+                "Yahoo" to "yahoo", "StartPage" to "startpage", "DuckDuckGo" to "duckduckgo"),
             selected = settings.searchEngineId,
             onDismiss = { dialog = null },
             onSelect = { id ->
