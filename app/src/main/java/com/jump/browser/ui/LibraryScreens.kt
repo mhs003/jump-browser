@@ -762,6 +762,7 @@ fun SettingsScreen(
     BackHandler(enabled = category != null) { category = null }
     var homepageDraft by remember { mutableStateOf(settings.homepageUrl) }
     var customSearchDraft by remember { mutableStateOf(settings.customSearchUrl) }
+    var backgroundDraft by remember { mutableIntStateOf(settings.homepageBackgroundOpacity) }
 
     fun toast(text: String) = JumpToast.show(context, text)
 
@@ -847,6 +848,26 @@ fun SettingsScreen(
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Homepage", settings.homepageUrl.ifBlank { null }) {
                         homepageDraft = settings.homepageUrl; dialog = "homepage"
+                    } }
+                    item { SettingsLabelRow("Logo", if (settings.homepageLogoPath.isBlank()) null else "Custom") {
+                        pickHomepageImage(context) { path ->
+                            onSettingsChange { it.copy(homepageLogoPath = path) }
+                        }
+                    } }
+                    item { SettingsLabelRow("Background", if (settings.homepageBackgroundPath.isBlank()) null else "Custom") {
+                        pickHomepageImage(context) { path ->
+                            onSettingsChange { it.copy(homepageBackgroundPath = path) }
+                        }
+                    } }
+                    item { SettingsLabelRow("Background opacity", "${settings.homepageBackgroundOpacity}%") {
+                        backgroundDraft = settings.homepageBackgroundOpacity
+                        dialog = "backgroundOpacity"
+                    } }
+                    item { SettingsLabelRow("Search bar", if (settings.homepageSearchBar) null else "Off") {
+                        onSettingsChange { it.copy(homepageSearchBar = !it.homepageSearchBar) }
+                    } }
+                    item { SettingsLabelRow("Colored bookmarks", if (settings.homepageFavoriteColor) null else "Off") {
+                        onSettingsChange { it.copy(homepageFavoriteColor = !it.homepageFavoriteColor) }
                     } }
                     item { SettingsLabelRow("Appearance", when (settings.darkMode) {
                         DarkMode.SYSTEM -> "Follow system"
@@ -1081,6 +1102,29 @@ fun SettingsScreen(
             confirmButton = {
                 JumpDialogButton(onClick = {
                     onSettingsChange { it.copy(homepageUrl = homepageDraft.trim()) }
+                    dialog = null
+                }) { Text("Save") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+    if (dialog == "backgroundOpacity") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Background opacity") },
+            text = {
+                Column {
+                    Text("$backgroundDraft%", fontSize = 14.sp)
+                    androidx.compose.material3.Slider(
+                        value = backgroundDraft.toFloat(),
+                        onValueChange = { backgroundDraft = it.toInt() },
+                        valueRange = 0f..100f,
+                    )
+                }
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    onSettingsChange { it.copy(homepageBackgroundOpacity = backgroundDraft) }
                     dialog = null
                 }) { Text("Save") }
             },
@@ -1487,5 +1531,18 @@ fun SavedPagesScreen(
                 }
             }
         }
+    }
+}
+
+
+private fun pickHomepageImage(context: android.content.Context, onPicked: (String) -> Unit) {
+    val activity = context as? com.jump.browser.MainActivity
+    if (activity == null) {
+        JumpToast.show(context, "Image selection is not available")
+        return
+    }
+    activity.pickHomepageImage { path ->
+        if (path == null) JumpToast.show(context, "No image selected")
+        else onPicked(path)
     }
 }

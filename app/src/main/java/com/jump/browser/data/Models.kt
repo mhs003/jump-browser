@@ -156,6 +156,14 @@ data class AppSettings(
     val textZoom: Int = 100,
     val incognitoDefault: Boolean = false,
     val confirmExit: Boolean = true,
+    val nightMode: Boolean = false,
+    val fullscreen: Boolean = false,
+    val customHomeCss: String = "",
+    val homepageLogoPath: String = "",
+    val homepageBackgroundPath: String = "",
+    val homepageBackgroundOpacity: Int = 100,
+    val homepageSearchBar: Boolean = true,
+    val homepageFavoriteColor: Boolean = true,
 ) {
     val searchEngine: SearchEngine
         get() {

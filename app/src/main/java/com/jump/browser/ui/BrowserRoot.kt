@@ -166,6 +166,10 @@ fun BrowserRoot(
         }
     }
 
+    LaunchedEffect(settings.fullscreen) {
+        if (settings.fullscreen) immersive = true
+    }
+
     LaunchedEffect(immersive) {
         val window = (context as? Activity)?.window ?: return@LaunchedEffect
         WindowCompat.getInsetsController(window, rootView).apply {
@@ -243,6 +247,11 @@ fun BrowserRoot(
 
     fun exitApp() {
         if (settings.confirmExit) exitDialog = true else onExit()
+    }
+
+    fun closeWindow() {
+        closeAllOverlays()
+        onExit()
     }
 
     BackHandler {
@@ -380,6 +389,11 @@ fun BrowserRoot(
                         onSearchClick = { startAddressEditing() },
                         onBookmarkClick = { bookmark -> controller.loadUrl(bookmark.url) },
                         onLogoClick = { recordsTab = 0; openPage(LibraryPage.RECORDS) },
+                        logoPath = settings.homepageLogoPath,
+                        backgroundPath = settings.homepageBackgroundPath,
+                        backgroundOpacity = settings.homepageBackgroundOpacity,
+                        searchBarEnabled = settings.homepageSearchBar,
+                        favoriteColorEnabled = settings.homepageFavoriteColor,
                         modifier = Modifier.graphicsLayer {
                             translationY = 72.dp.toPx() * homeOffset
                             alpha = 1f - 0.9f * homeOffset
@@ -466,9 +480,11 @@ fun BrowserRoot(
                 showMenu = false
                 when (action) {
                     MenuAction.NIGHT -> {
-                        container.settings.update {
-                            it.copy(darkMode = if (dark) DarkMode.LIGHT else DarkMode.DARK)
-                        }
+                        val next = !settings.nightMode
+                        container.settings.update { it.copy(nightMode = next) }
+                        controller.isDarkTheme = next || settings.darkMode == DarkMode.DARK
+                        controller.applySettingsToAll()
+                        controller.reload()
                     }
                     MenuAction.BOOKMARKS -> { recordsTab = 0; openPage(LibraryPage.RECORDS) }
                     MenuAction.HISTORY -> { recordsTab = 1; openPage(LibraryPage.RECORDS) }
@@ -690,7 +706,12 @@ fun BrowserRoot(
                             controller.applySettingsToAll()
                         },
                         onClearData = {
+                            val wasIncognito = active?.incognito == true
+                            controller.closeAllTabs()
                             controller.clearBrowsingData(true, true, true)
+                            controller.newHomeTab()
+                            if (wasIncognito) controller.newTab(null, incognito = true)
+                            page = LibraryPage.NONE
                         },
                         onAbout = { aboutDialog = true },
                     )

@@ -33,6 +33,14 @@ class SettingsRepository(private val context: Context) {
             val o = JSONObject(prefs.getString("settings_json", "{}") ?: "{}")
             AppSettings(
                 searchEngineId = o.optString("searchEngineId", defaults.searchEngineId),
+                nightMode = o.optBoolean("nightMode", defaults.nightMode),
+                fullscreen = o.optBoolean("fullscreen", defaults.fullscreen),
+                customHomeCss = o.optString("customHomeCss", defaults.customHomeCss),
+                homepageLogoPath = o.optString("homepageLogoPath", defaults.homepageLogoPath),
+                homepageBackgroundPath = o.optString("homepageBackgroundPath", defaults.homepageBackgroundPath),
+                homepageBackgroundOpacity = o.optInt("homepageBackgroundOpacity", defaults.homepageBackgroundOpacity),
+                homepageSearchBar = o.optBoolean("homepageSearchBar", defaults.homepageSearchBar),
+                homepageFavoriteColor = o.optBoolean("homepageFavoriteColor", defaults.homepageFavoriteColor),
                 customSearchUrl = o.optString("customSearchUrl", defaults.customSearchUrl),
                 homepageUrl = o.optString("homepageUrl", defaults.homepageUrl),
                 darkMode = runCatching { DarkMode.valueOf(o.optString("darkMode", "LIGHT")) }
@@ -62,6 +70,14 @@ class SettingsRepository(private val context: Context) {
     private fun save(s: AppSettings) {
         val o = JSONObject()
             .put("searchEngineId", s.searchEngineId)
+            .put("nightMode", s.nightMode)
+            .put("fullscreen", s.fullscreen)
+            .put("customHomeCss", s.customHomeCss)
+            .put("homepageLogoPath", s.homepageLogoPath)
+            .put("homepageBackgroundPath", s.homepageBackgroundPath)
+            .put("homepageBackgroundOpacity", s.homepageBackgroundOpacity)
+            .put("homepageSearchBar", s.homepageSearchBar)
+            .put("homepageFavoriteColor", s.homepageFavoriteColor)
             .put("customSearchUrl", s.customSearchUrl)
             .put("homepageUrl", s.homepageUrl)
             .put("darkMode", s.darkMode.name)

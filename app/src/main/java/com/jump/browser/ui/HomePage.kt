@@ -59,6 +59,11 @@ fun HomePage(
     onBookmarkClick: (Bookmark) -> Unit,
     onLogoClick: () -> Unit = {},
     modifier: Modifier = Modifier,
+    logoPath: String = "",
+    backgroundPath: String = "",
+    backgroundOpacity: Int = 100,
+    searchBarEnabled: Boolean = true,
+    favoriteColorEnabled: Boolean = true,
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val maxPull = with(density) { 98.dp.toPx() }
@@ -69,6 +74,10 @@ fun HomePage(
         animationSpec = if (dragging) snap() else tween(140),
         label = "home-pull",
     )
+    val backgroundBitmap = remember(backgroundPath) {
+        if (backgroundPath.isBlank()) null
+        else runCatching { BitmapFactory.decodeFile(backgroundPath)?.asImageBitmap() }.getOrNull()
+    }
     Box(
         modifier
             .fillMaxSize()
@@ -96,6 +105,14 @@ fun HomePage(
                 )
             }
     ) {
+        if (backgroundBitmap != null) {
+            Image(
+                bitmap = backgroundBitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = backgroundOpacity / 100f },
+                contentScale = ContentScale.Crop,
+            )
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -104,13 +121,26 @@ fun HomePage(
         ) {
             // The homepage body begins 135px below the WebView top for this viewport.
             Spacer(Modifier.height(135.dp))
+            val logoBitmap = remember(logoPath) {
+                if (logoPath.isBlank()) null
+                else runCatching { BitmapFactory.decodeFile(logoPath)?.asImageBitmap() }.getOrNull()
+            }
             Box(Modifier.clickable { onLogoClick() }) {
-                JumpLogo(Modifier.size(99.dp, 72.dp))
+                if (logoBitmap != null) {
+                    Image(
+                        bitmap = logoBitmap,
+                        contentDescription = null,
+                        modifier = Modifier.size(99.dp, 72.dp).clip(RoundedCornerShape(15.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    JumpLogo(Modifier.size(99.dp, 72.dp))
+                }
             }
             Spacer(Modifier.height(22.dp))
             // .search_part is 90% wide with a 15dp gap before the 46dp field.
-            Spacer(Modifier.height(15.dp))
-            Box(
+            if (searchBarEnabled) Spacer(Modifier.height(15.dp))
+            if (searchBarEnabled) Box(
                 Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp)
@@ -132,7 +162,7 @@ fun HomePage(
             }
             if (bookmarks.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                HomeShortcuts(bookmarks.take(18), onBookmarkClick)
+                HomeShortcuts(bookmarks.take(18), favoriteColorEnabled, onBookmarkClick)
             }
             Spacer(Modifier.weight(1f))
         }
@@ -140,7 +170,11 @@ fun HomePage(
 }
 
 @Composable
-private fun HomeShortcuts(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit) {
+private fun HomeShortcuts(
+    bookmarks: List<Bookmark>,
+    colorsEnabled: Boolean,
+    onClick: (Bookmark) -> Unit,
+) {
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -148,7 +182,7 @@ private fun HomeShortcuts(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit
         bookmarks.chunked(6).forEach { rowItems ->
             Row(horizontalArrangement = Arrangement.Center) {
                 rowItems.forEach { bookmark ->
-                    FavoriteTile(bookmark, onClick)
+                    FavoriteTile(bookmark, colorsEnabled, onClick)
                     Spacer(Modifier.width(18.dp))
                 }
                 repeat(6 - rowItems.size) { Spacer(Modifier.width(72.dp)) }
@@ -158,7 +192,7 @@ private fun HomeShortcuts(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit
 }
 
 @Composable
-private fun FavoriteTile(bookmark: Bookmark, onClick: (Bookmark) -> Unit) {
+private fun FavoriteTile(bookmark: Bookmark, colorsEnabled: Boolean, onClick: (Bookmark) -> Unit) {
     val icon = remember(bookmark.iconPath) {
         if (bookmark.iconPath.isBlank()) null
         else runCatching { BitmapFactory.decodeFile(bookmark.iconPath)?.asImageBitmap() }.getOrNull()
@@ -174,7 +208,7 @@ private fun FavoriteTile(bookmark: Bookmark, onClick: (Bookmark) -> Unit) {
         Box(
             Modifier
                 .size(54.dp)
-                .background(tileColor, RoundedCornerShape(15.dp)),
+                .background(if (colorsEnabled) tileColor else Color.Transparent, RoundedCornerShape(15.dp)),
             contentAlignment = Alignment.Center,
         ) {
             if (icon != null) {

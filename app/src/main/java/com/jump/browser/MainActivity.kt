@@ -22,6 +22,34 @@ import com.jump.browser.ui.theme.JumpTheme
 
 class MainActivity : ComponentActivity() {
     private var controller: BrowserController? = null
+    private var pendingImageTarget: ((String?) -> Unit)? = null
+
+    private val imagePicker = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        val callback = pendingImageTarget
+        pendingImageTarget = null
+        callback?.invoke(uri?.let { copyHomepageImage(it) })
+    }
+
+    /** Lets settings pick a custom homepage logo or background. */
+    fun pickHomepageImage(onResult: (String?) -> Unit) {
+        pendingImageTarget = onResult
+        runCatching { imagePicker.launch("image/*") }
+            .onFailure {
+                pendingImageTarget = null
+                onResult(null)
+            }
+    }
+
+    private fun copyHomepageImage(uri: android.net.Uri): String? = runCatching {
+        val dir = java.io.File(filesDir, "homepage").apply { mkdirs() }
+        val file = java.io.File(dir, "image-${System.currentTimeMillis()}.png")
+        contentResolver.openInputStream(uri)?.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        }
+        file.absolutePath
+    }.getOrNull()
 
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("via_clone_prefs", Context.MODE_PRIVATE)
@@ -51,7 +79,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings = app.container.settings.settings
             val systemDark = isSystemInDarkTheme()
-            val dark = when (settings.darkMode) {
+            // Night mode in the menu is separate from the app chrome theme: it
+            // darkens web pages (like the reference's injected night CSS).
+            val dark = settings.nightMode || when (settings.darkMode) {
                 DarkMode.SYSTEM -> systemDark
                 DarkMode.LIGHT -> false
                 DarkMode.DARK -> true

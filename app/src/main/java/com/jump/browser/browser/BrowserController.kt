@@ -1248,6 +1248,8 @@ class BrowserController(
         sessions.values.forEach {
             it.webView?.clearFormData()
             it.webView?.clearHistory()
+            // Drop the loaded page so the cleared cookies and cache are not reused.
+            it.webView?.loadUrl("about:blank")
         }
         if (clearCache) {
             sessions.values.forEach { it.webView?.clearCache(true) }
@@ -1258,6 +1260,7 @@ class BrowserController(
             CookieManager.getInstance().flush()
         }
         if (clearHistory) app.history.clear()
+        CookieManager.getInstance().flush()
         notify("Browsing data cleared")
     }
 
