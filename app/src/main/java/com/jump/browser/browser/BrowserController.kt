@@ -571,8 +571,23 @@ class BrowserController(
             @Suppress("DEPRECATION")
             w.settings.forceDark = WebSettings.FORCE_DARK_OFF
         }
-        val darkCss = "html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important;}" +
-            "img,video,picture,canvas,svg,iframe{filter:invert(1) hue-rotate(180deg)!important;}"
+        // Mirrors the reference night stylesheet: forced dark background, gray
+        // text, teal links and dimmed visited links. Images are left intact.
+        val darkCss = """
+            html{background-color:#000!important}
+            *{color:#999!important;box-shadow:none!important;background-color:transparent!important;
+              border-color:#444!important;border-top-color:#444!important;border-bottom-color:#444!important;
+              border-left-color:#444!important;border-right-color:#444!important}
+            body{background-color:transparent!important}
+            :after,:before{background-color:transparent!important;border-color:#444!important}
+            a,a *{color:#409B9B!important;text-decoration:none!important}
+            a:hover,a:hover *,a:visited:hover,a:visited:hover *{color:#F0F0F0!important}
+            a:visited,a:visited *{color:#607069!important}
+            h1,h2,h3,h4,h5,h6,strong,[class*=header],[id*=header]{color:#DDD!important}
+            code,pre,blockquote{background-color:#111!important}
+            input,textarea,select,button{background-color:#151515!important;color:#BBB!important}
+            ::selection{background-color:#377!important;color:#000!important}
+        """.trimIndent()
         val js = if (isDarkTheme) {
             "(function(){var s=document.getElementById('jump-night-css');" +
                 "if(!s){s=document.createElement('style');s.id='jump-night-css';(document.head||document.documentElement).appendChild(s);}" +
