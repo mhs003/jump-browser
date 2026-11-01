@@ -103,6 +103,7 @@ fun TitleBar(
     onLeftClick: () -> Unit,
     onRightClick: () -> Unit,
     onTitleLongClick: () -> Unit,
+    onSecureClick: () -> Unit = {},
 ) {
     val isHome = tab?.isHome != false
     val leftIcon = when {
@@ -120,9 +121,9 @@ fun TitleBar(
         } else {
             ChromeButton(
                 icon = leftIcon,
-                contentDescription = "Site info",
+                contentDescription = if (tab?.secure == true) "Secure connection" else "Not secure",
                 size = 22,
-                onClick = onLeftClick,
+                onClick = onSecureClick,
             )
         }
         Box(
@@ -411,6 +412,7 @@ fun TopChrome(
     onLeftClick: () -> Unit,
     onRightClick: () -> Unit,
     onTitleLongClick: () -> Unit,
+    onSecureClick: () -> Unit,
 ) {
     AnimatedContent(
         targetState = editing,
@@ -436,6 +438,7 @@ fun TopChrome(
                 onLeftClick = onLeftClick,
                 onRightClick = onRightClick,
                 onTitleLongClick = onTitleLongClick,
+                onSecureClick = onSecureClick,
             )
         }
     }

@@ -334,6 +334,7 @@ fun BrowserRoot(
                 onSubmitAddress = { submitAddress() },
                 onExpandAddress = { fullScreenAddress = true },
                 onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                 onRightClick = {
                     if (active?.isHome != false) qrScreen = true
                     else if (active?.loading == true) controller.stopLoading()
