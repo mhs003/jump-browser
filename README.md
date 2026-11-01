@@ -34,6 +34,14 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
 - **Reference toast surface.** Short messages use Jump's own bottom pill instead
   of the platform toast, with the reference geometry, duration and action slot.
 - **Find in page.** Live match count with previous/next navigation.
+- **Resource sniffer and network log.** Live MIME-classified request capture
+  while the panel is open, with open/download/copy actions and request timing.
+- **Read aloud.** Article-aware text-to-speech using the platform engine, with
+  a second activation stopping playback.
+- **Saved pages.** Web archives are listed, reopened and deleted in-app.
+- **Customization.** Custom homepage logo and background with opacity, optional
+  homepage search bar and colored tiles, a separate Night mode, user-agent
+  choice, reorderable menu, and top/bottom/slim toolbar layouts.
 - **QR scanner.** CameraX preview with ZXing decoding, plus a clipboard
   fallback.
 - **Privacy controls.** Built-in network and cosmetic ad blocking, optional
@@ -119,9 +127,10 @@ The signed release is 2.2 MB.
 
 Known gaps: incognito tabs suppress history without isolating cookies because
 Android WebView profiles are only available on newer WebView providers.
-Bookmarks are flat rather than folder-based, and saved-page management is still
-limited. Advanced data panels such as the resource sniffer, network log and
-read-aloud engine remain extension points rather than hidden implementations.
+Bookmarks are flat rather than folder-based, sync and the password manager are
+not implemented, and scripts/AI panels are not available. Resource sniffing and
+the network log only record traffic while their panel is open, and the network
+log cannot show response sizes because WebView does not expose them.
 
 ## License
 
