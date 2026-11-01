@@ -75,6 +75,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.jump.browser.ui.JumpToast
@@ -826,7 +829,7 @@ fun BrowserRoot(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.20f))
+                .background(Color.Black.copy(alpha = 0.32f))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
@@ -838,69 +841,82 @@ fun BrowserRoot(
                     .fillMaxWidth()
                     .padding(top = topInset + 48.dp),
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
-                shadowElevation = 8.dp,
+                shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+                shadowElevation = 0.dp,
             ) {
-                Column(Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 16.dp)) {
+                Column(Modifier.fillMaxWidth()) {
                     Row(
-                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 0.dp),
+                        Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                if (tab?.isHome == true) "Homepage" else (tab?.title ?: "Site info"),
-                                fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.onBackground,
+                            BasicText(
+                                text = if (tab?.isHome == true) "Homepage" else (tab?.title ?: "Site info"),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Spacer(Modifier.height(6.5.dp))
-                            Text(
-                                tab?.url ?: "jump://homepage",
-                                fontSize = 14.sp,
-                                color = Color(0xFF008000),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                            if (tab?.isHome != true) {
+                                Spacer(Modifier.height(4.dp))
+                                BasicText(
+                                    text = tab?.url ?: "",
+                                    style = TextStyle(
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF008000),
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (tab?.isHome != true) {
+                            ChromeButton(
+                                icon = ReferenceIcons.Clock,
+                                contentDescription = "History for this site",
+                                size = 22,
+                                onClick = {
+                                    siteInfoDialog = false
+                                    recordsTab = 1
+                                    openPage(LibraryPage.RECORDS)
+                                },
+                            )
+                            ChromeButton(
+                                icon = ReferenceIcons.CustomizeMenu,
+                                contentDescription = "Site configuration",
+                                size = 22,
+                                onClick = {
+                                    JumpToast.show(context, "Site configuration is not available")
+                                },
                             )
                         }
-                        ChromeButton(
-                            icon = ReferenceIcons.Clock,
-                            contentDescription = "History for this site",
-                            size = 22,
-                            onClick = {
-                                siteInfoDialog = false
-                                recordsTab = 1
-                                openPage(LibraryPage.RECORDS)
-                            },
-                        )
-                        ChromeButton(
-                            icon = ReferenceIcons.CustomizeMenu,
-                            contentDescription = "Site configuration",
-                            size = 22,
-                            onClick = {
-                                JumpToast.show(context, "Site configuration is not available")
-                            },
-                        )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    SiteInfoAction("View certificate") {
-                        JumpToast.show(context, if (tab?.secure == true) "Connection is secure" else "Connection is not secure")
-                        siteInfoDialog = false
-                    }
-                    SiteInfoAction("View Cookies") {
-                        JumpToast.show(context, "No site cookies to display")
-                        siteInfoDialog = false
+                    Spacer(Modifier.height(4.dp))
+                    if (tab?.isHome != true) {
+                        SiteInfoAction("View certificate") {
+                            JumpToast.show(context, if (tab?.secure == true) "Connection is secure" else "Connection is not secure")
+                            siteInfoDialog = false
+                        }
+                        SiteInfoAction("View Cookies") {
+                            JumpToast.show(context, "No site cookies to display")
+                            siteInfoDialog = false
+                        }
                     }
                     SiteInfoAction("Site configuration") {
                         JumpToast.show(context, "Site configuration is not available")
                     }
-                    SiteInfoAction("Show reader") {
-                        siteInfoDialog = false
-                        controller.extractReader { data ->
-                            if (data == null) JumpToast.show(context, "Reader mode is not available for this page")
-                            else reader = data
+                    if (tab?.isHome != true) {
+                        SiteInfoAction("Show reader") {
+                            siteInfoDialog = false
+                            controller.extractReader { data ->
+                                if (data == null) JumpToast.show(context, "Reader mode is not available for this page")
+                                else reader = data
+                            }
                         }
                     }
+                    Spacer(Modifier.height(6.dp))
                 }
             }
         }
@@ -1145,10 +1161,13 @@ private fun SuggestionRow(
 
 @Composable
 private fun SiteInfoAction(label: String, onClick: () -> Unit) {
-    Text(
-        label,
-        fontSize = 14.sp,
-        color = MaterialTheme.colorScheme.primary,
+    BasicText(
+        text = label,
+        style = TextStyle(
+            fontSize = 16.sp,
+            color = if (MaterialTheme.colorScheme.onBackground.luminance() > 0.5f) JumpAccent
+            else Color(0xFF7F9EE8),
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .pressable { onClick() }
