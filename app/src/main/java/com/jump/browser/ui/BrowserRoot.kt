@@ -453,6 +453,7 @@ fun BrowserRoot(
 
         MenuOverlay(
             visible = showMenu,
+            bottomInset = bottomInsetPx,
             tab = active,
             bookmarked = active?.url?.let { container.bookmarks.isBookmarked(it) } == true,
             isDark = dark,

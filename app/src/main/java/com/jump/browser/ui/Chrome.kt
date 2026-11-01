@@ -532,6 +532,7 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
 @Composable
 fun MenuOverlay(
     visible: Boolean,
+    bottomInset: Int,
     tab: TabInfo?,
     bookmarked: Boolean,
     isDark: Boolean,
@@ -558,8 +559,8 @@ fun MenuOverlay(
                 enter = slideInVertically(tween(160, easing = FastOutLinearInEasing)) { slidePx } + fadeIn(tween(160)),
                 exit = slideOutVertically(tween(160, easing = FastOutLinearInEasing)) { slidePx } + fadeOut(tween(160)),
                 modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(horizontal = 1.dp),
+                    .padding(horizontal = 1.dp)
+                    .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() }),
             ) {
                 MenuSheetContent(
                     tab = tab,
@@ -645,7 +646,7 @@ private fun MenuSheetContent(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(206.dp)
+            .height(220.dp)
             .clip(shape)
             .border(1.dp, com.jump.browser.ui.theme.JumpPressed, shape),
         color = MaterialTheme.colorScheme.surface,
