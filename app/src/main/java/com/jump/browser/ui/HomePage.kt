@@ -21,8 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -107,12 +108,14 @@ fun HomePage(
                 JumpLogo(Modifier.size(99.dp, 72.dp))
             }
             Spacer(Modifier.height(22.dp))
+            // .search_part is 90% wide with a 15dp gap before the 46dp field.
+            Spacer(Modifier.height(15.dp))
             Box(
                 Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(13.dp))
                     .background(Color.Transparent)
                     .clickable { onSearchClick() },
                 contentAlignment = Alignment.CenterStart,
@@ -122,14 +125,14 @@ fun HomePage(
                     drawRoundRect(
                         color = outline,
                         size = size,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx()),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(13.dp.toPx()),
                         style = Stroke(width = 1.dp.toPx()),
                     )
                 }
             }
             if (bookmarks.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
-                HomeShortcuts(bookmarks.take(15), onBookmarkClick)
+                Spacer(Modifier.height(8.dp))
+                HomeShortcuts(bookmarks.take(18), onBookmarkClick)
             }
             Spacer(Modifier.weight(1f))
         }
@@ -142,12 +145,13 @@ private fun HomeShortcuts(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        bookmarks.chunked(5).forEach { rowItems ->
+        bookmarks.chunked(6).forEach { rowItems ->
             Row(horizontalArrangement = Arrangement.Center) {
                 rowItems.forEach { bookmark ->
                     FavoriteTile(bookmark, onClick)
+                    Spacer(Modifier.width(18.dp))
                 }
-                repeat(5 - rowItems.size) { Spacer(Modifier.width(64.dp)) }
+                repeat(6 - rowItems.size) { Spacer(Modifier.width(72.dp)) }
             }
         }
     }
@@ -162,42 +166,43 @@ private fun FavoriteTile(bookmark: Bookmark, onClick: (Bookmark) -> Unit) {
     val tileColor = remember(bookmark.url) { favoriteColor(bookmark.url) }
     Column(
         Modifier
-            .width(64.dp)
+            .width(54.dp)
             .clickable { onClick(bookmark) }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             Modifier
-                .size(46.dp)
-                .background(tileColor, CircleShape),
+                .size(54.dp)
+                .background(tileColor, RoundedCornerShape(15.dp)),
             contentAlignment = Alignment.Center,
         ) {
             if (icon != null) {
                 Image(
                     bitmap = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(46.dp).clip(CircleShape),
+                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(15.dp)),
                     contentScale = ContentScale.Crop,
                 )
-            } else {
+            } else if (bookmark.title.isNotBlank()) {
                 Text(
-                    text = bookmark.title.trim().take(1).uppercase().ifBlank { "•" },
+                    text = bookmark.title.trim().take(1).uppercase(),
                     color = Color.White,
                     fontSize = 15.sp,
                 )
             }
         }
         Spacer(Modifier.height(2.dp))
-        Text(
+        BasicText(
             text = bookmark.title.ifBlank { bookmark.url },
-            fontSize = 10.sp,
-            lineHeight = 10.sp,
-            color = MaterialTheme.colorScheme.onBackground,
+            style = TextStyle(
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+            ),
             maxLines = 1,
             overflow = TextOverflow.Clip,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(46.dp),
+            modifier = Modifier.width(54.dp),
         )
     }
 }

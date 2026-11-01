@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,7 +65,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -108,12 +112,19 @@ fun TitleBar(
         else -> ReferenceIcons.Search
     }
     Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-        ChromeButton(
-            icon = leftIcon,
-            contentDescription = if (isHome) "Search" else "Site info",
-            size = 22,
-            onClick = onLeftClick,
-        )
+        if (isHome) {
+            Box(
+                Modifier.size(48.dp).jumpClickable { onLeftClick() },
+                contentAlignment = Alignment.Center,
+            ) { SearchGlyph() }
+        } else {
+            ChromeButton(
+                icon = leftIcon,
+                contentDescription = "Site info",
+                size = 22,
+                onClick = onLeftClick,
+            )
+        }
         Box(
             Modifier
                 .weight(1f)
@@ -196,6 +207,31 @@ private fun TitleAction(label: String, onClick: () -> Unit) {
     }
 }
 
+/** CSS-style homepage magnifier: 12dp circle with a 2dp stroke and a short handle. */
+@Composable
+fun SearchGlyph(modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onBackground) {
+    Canvas(modifier.size(22.dp)) {
+        val stroke = 2.dp.toPx()
+        val radius = 7.dp.toPx()
+        val center = Offset(size.width * 0.44f, size.height * 0.44f)
+        drawCircle(
+            color = tint,
+            radius = radius,
+            center = center,
+            style = Stroke(width = stroke),
+        )
+        val start = Offset(
+            center.x + radius * 0.72f,
+            center.y + radius * 0.72f,
+        )
+        val end = Offset(
+            center.x + radius + 3.6.dp.toPx(),
+            center.y + radius + 3.6.dp.toPx(),
+        )
+        drawLine(color = tint, start = start, end = end, strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+}
+
 @Composable
 fun AddressBar(
     value: TextFieldValue,
@@ -219,7 +255,8 @@ fun AddressBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            ChromeIcon(ReferenceIcons.Search, "Search", size = 22)
+            if (incognito) ChromeIcon(ReferenceIcons.Incognito, "Incognito", size = 22)
+            else SearchGlyph()
         }
         Box(
             Modifier.weight(1f).fillMaxHeight(),
