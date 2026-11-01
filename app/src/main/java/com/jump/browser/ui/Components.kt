@@ -283,13 +283,17 @@ fun DividerLine(modifier: Modifier = Modifier) {
 fun Dot(selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .padding(horizontal = 2.dp)
+            .padding(horizontal = 4.dp, vertical = 7.dp)
             .size(4.dp)
             .clip(CircleShape)
             .background(
-                MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) 0.45f else 0.12f)
+                MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) 0.42f else 0.18f)
             )
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
     )
 }
 
