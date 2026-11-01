@@ -36,12 +36,12 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebSettingsCompat
+import com.jump.browser.ui.JumpToast
 import com.jump.browser.data.AppContainer
 import com.jump.browser.data.TabSnapshot
 import com.jump.browser.data.TabStore
@@ -448,7 +448,7 @@ class BrowserController(
             w.settings.userAgentString = if (enabled) desktopUa else null
             w.reload()
         }
-        Toast.makeText(activity, if (enabled) "Desktop site enabled" else "Desktop site disabled", Toast.LENGTH_SHORT).show()
+        JumpToast.show(activity, if (enabled) "Desktop site enabled" else "Desktop site disabled")
     }
 
     fun setIncognito(enabled: Boolean) {
@@ -1214,7 +1214,7 @@ class BrowserController(
     }
 
     fun notify(message: CharSequence) {
-        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        JumpToast.show(activity, message.toString())
     }
 }
 

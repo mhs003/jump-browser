@@ -4,6 +4,22 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Environment
 import android.content.pm.PackageManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -41,7 +57,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,9 +79,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jump.browser.ui.JumpToast
 import com.jump.browser.data.AppSettings
 import com.jump.browser.data.Bookmark
 import com.jump.browser.data.DarkMode
@@ -81,7 +98,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.widget.Toast
 import java.util.Locale
 
 @Composable
@@ -89,6 +105,9 @@ fun ScreenScaffold(
     title: String,
     onBack: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {},
+    headerHeight: androidx.compose.ui.unit.Dp = 48.dp,
+    titleSize: androidx.compose.ui.unit.TextUnit = 16.sp,
+    titleStartPadding: androidx.compose.ui.unit.Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -98,14 +117,15 @@ fun ScreenScaffold(
             .statusBarsPadding()
     ) {
         Row(
-            Modifier.fillMaxWidth().height(48.dp),
+            Modifier.fillMaxWidth().height(headerHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ChromeButton(ReferenceIcons.Back, "Back", onClick = onBack)
+            Spacer(Modifier.width(titleStartPadding))
             Text(
                 text = title,
                 modifier = Modifier.weight(1f),
-                fontSize = 16.sp,
+                fontSize = titleSize,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -131,25 +151,24 @@ fun BookmarkEditDialog(
         title = { Text(if (initial == null) "Add bookmark" else "Edit bookmark") },
         text = {
             Column {
-                TextField(
+                JumpTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title") },
-                    singleLine = true,
+                    placeholder = "Title",
                 )
-                Spacer(Modifier.height(10.dp))
-                TextField(
+                Spacer(Modifier.height(16.dp))
+                JumpTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("URL") },
-                    singleLine = true,
+                    placeholder = "URL",
+                    keyboardType = KeyboardType.Uri,
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { if (url.isNotBlank()) onSave(title, url) }) { Text("Save") }
+            JumpDialogButton(onClick = { if (url.isNotBlank()) onSave(title, url) }) { Text("Save") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { JumpDialogButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
@@ -326,9 +345,9 @@ fun RecordsScreen(
                     fontSize = 16.sp,
                     modifier = Modifier.clickable {
                         when {
-                            tab == 1 -> Toast.makeText(context, "Use the toolbar to switch tabs", Toast.LENGTH_SHORT).show()
+                            tab == 1 -> JumpToast.show(context, "Use the toolbar to switch tabs")
                             tab == 0 -> showAdd = true
-                            else -> Toast.makeText(context, "No saved pages", Toast.LENGTH_SHORT).show()
+                            else -> JumpToast.show(context, "No saved pages")
                         }
                     }.padding(vertical = 8.dp),
                 )
@@ -369,9 +388,9 @@ fun RecordsScreen(
             title = { Text("Clear history?") },
             text = { Text("All browsing history will be permanently deleted.") },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClearHistory() }) { Text("Clear") }
+                JumpDialogButton(onClick = { confirmClear = false; onClearHistory() }) { Text("Clear") }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+            dismissButton = { JumpDialogButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
     }
 }
@@ -609,7 +628,7 @@ fun DownloadsScreen(
                 Text("Done", fontSize = 16.sp, modifier = Modifier.clickable { editing = false; selected = emptySet() }.padding(vertical = 8.dp))
             } else {
                 Text("New", fontSize = 16.sp, modifier = Modifier.clickable {
-                    Toast.makeText(context, "Start a download from a web page", Toast.LENGTH_SHORT).show()
+                    JumpToast.show(context, "Start a download from a web page")
                 }.padding(vertical = 8.dp))
                 Spacer(Modifier.weight(1f))
                 Text(
@@ -741,17 +760,33 @@ fun SettingsScreen(
     var homepageDraft by remember { mutableStateOf(settings.homepageUrl) }
     var customSearchDraft by remember { mutableStateOf(settings.customSearchUrl) }
 
-    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    fun toast(text: String) = JumpToast.show(context, text)
 
-    ScreenScaffold(
-        title = category ?: "Settings",
-        onBack = { if (category != null) category = null else onBack() },
-    ) {
-        when (category) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val drag = remember { androidx.compose.animation.core.Animatable(0f) }
+    var instantCategoryChange by remember { mutableStateOf(false) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
+    @Composable
+    fun SettingsPage(cat: String?) {
+        ScreenScaffold(
+            title = cat ?: "Settings",
+            onBack = { if (cat != null) category = null else onBack() },
+            headerHeight = 54.dp,
+            titleSize = 20.sp,
+            titleStartPadding = 2.dp,
+        ) {
+        when (cat) {
             null -> {
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     listOf("General", "Customization", "Privacy", "Advanced", "Scripts", "About").forEach { title ->
-                        item { SettingsLabelRow(title) { category = title } }
+                        item {
+                            SettingsLabelRow(
+                                title = title,
+                                titleSize = 16.sp,
+                                verticalPadding = 17.5.dp,
+                            ) { category = title }
+                        }
                     }
                     item { Spacer(Modifier.height(24.dp)) }
                 }
@@ -883,6 +918,85 @@ fun SettingsScreen(
             }
         }
     }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val widthPx = constraints.maxWidth.toFloat()
+        val previewStart = maxOf(widthPx * 0.3f, with(density) { 66.dp.toPx() })
+        if (category != null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX =
+                            -previewStart * (1f - (drag.value / widthPx).coerceIn(0f, 1f))
+                    },
+            ) {
+                SettingsPage(null)
+            }
+        }
+        AnimatedContent(
+            targetState = category,
+            transitionSpec = {
+                if (instantCategoryChange) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else if (targetState != null) {
+                    slideInHorizontally(
+                        animationSpec = tween(220, easing = Easing { t -> t * t * (3f - 2f * t) }),
+                        initialOffsetX = { it },
+                    ) togetherWith slideOutHorizontally(
+                        animationSpec = tween(220, easing = Easing { t -> t * t * (3f - 2f * t) }),
+                        targetOffsetX = { -(it * 0.3f).toInt() },
+                    )
+                } else {
+                    slideInHorizontally(
+                        animationSpec = tween(220, easing = Easing { t -> t * t * (3f - 2f * t) }),
+                        initialOffsetX = { -(it * 0.3f).toInt() },
+                    ) togetherWith slideOutHorizontally(
+                        animationSpec = tween(220, easing = Easing { t -> t * t * (3f - 2f * t) }),
+                        targetOffsetX = { it },
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationX = drag.value }
+                .pointerInput(category) {
+                    if (category != null) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                scope.launch {
+                                    if (drag.value > widthPx * 0.46f) {
+                                        drag.animateTo(
+                                            widthPx,
+                                            tween(220, easing = Easing { t -> t * t * (3f - 2f * t) }),
+                                        )
+                                        instantCategoryChange = true
+                                        category = null
+                                        drag.snapTo(0f)
+                                        kotlinx.coroutines.delay(60)
+                                        instantCategoryChange = false
+                                    } else {
+                                        drag.animateTo(0f, tween(300))
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch { drag.animateTo(0f, tween(300)) }
+                            },
+                        ) { change, amount ->
+                            change.consume()
+                            scope.launch {
+                                drag.snapTo((drag.value + amount).coerceIn(0f, widthPx))
+                            }
+                        }
+                    }
+                },
+            label = "settings-page",
+        ) { cat ->
+            SettingsPage(cat)
+        }
+    }
 
     if (dialog == "engine") {
         ChoiceDialog(
@@ -928,16 +1042,16 @@ fun SettingsScreen(
                 Column {
                     Text("Use %s where the search query should go.", fontSize = 13.sp)
                     Spacer(Modifier.height(8.dp))
-                    TextField(
+                    JumpTextField(
                         value = customSearchDraft,
                         onValueChange = { customSearchDraft = it },
-                        singleLine = true,
-                        placeholder = { Text("https://example.com/search?q=%s") },
+                        placeholder = "https://example.com/search?q=%s",
+                        keyboardType = KeyboardType.Uri,
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                JumpDialogButton(onClick = {
                     var template = customSearchDraft.trim()
                     if (template.isNotEmpty() && !template.contains("%s")) {
                         template += (if (template.contains("?")) "&q=%s" else "?q=%s")
@@ -946,7 +1060,7 @@ fun SettingsScreen(
                     dialog = null
                 }) { Text("Save") }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "homepage") {
@@ -954,20 +1068,20 @@ fun SettingsScreen(
             onDismissRequest = { dialog = null },
             title = { Text("Homepage") },
             text = {
-                TextField(
+                JumpTextField(
                     value = homepageDraft,
                     onValueChange = { homepageDraft = it },
-                    singleLine = true,
-                    placeholder = { Text("Leave empty for Jump Homepage") },
+                    placeholder = "Leave empty for Jump Homepage",
+                    keyboardType = KeyboardType.Uri,
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                JumpDialogButton(onClick = {
                     onSettingsChange { it.copy(homepageUrl = homepageDraft.trim()) }
                     dialog = null
                 }) { Text("Save") }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "clear") {
@@ -976,9 +1090,9 @@ fun SettingsScreen(
             title = { Text("Clear browsing data?") },
             text = { Text("This clears history, cookies and the page cache. Bookmarks and downloads are kept.") },
             confirmButton = {
-                TextButton(onClick = { dialog = null; onClearData() }) { Text("Clear") }
+                JumpDialogButton(onClick = { dialog = null; onClearData() }) { Text("Clear") }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
 }
@@ -987,19 +1101,21 @@ fun SettingsScreen(
 private fun SettingsLabelRow(
     title: String,
     subtitle: String? = null,
+    titleSize: androidx.compose.ui.unit.TextUnit = 14.sp,
+    verticalPadding: androidx.compose.ui.unit.Dp = 21.125.dp,
     onClick: () -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .pressable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 21.125.dp),
+            .padding(horizontal = 16.dp, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                fontSize = 14.sp,
+                fontSize = titleSize,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1047,7 +1163,7 @@ fun ChoiceDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { JumpDialogButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
