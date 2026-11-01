@@ -41,7 +41,8 @@ val JumpOutlineDark = Color(0xFF3A3A3D)
 val JumpAddressLight = Color(0xFFEEEEEE)
 val JumpAddressDark = Color(0xFF242426)
 val JumpPressed = Color(0x30808080)
-val JumpScrim = Color(0x2E000000)
+val JumpRipple = Color(0x30808080)
+val JumpScrim = Color(0x20000000)
 
 private val Light = lightColorScheme(
     primary = JumpAccent,

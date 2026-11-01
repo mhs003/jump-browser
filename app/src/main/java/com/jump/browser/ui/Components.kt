@@ -1,10 +1,14 @@
 package com.jump.browser.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -12,38 +16,73 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.JumpPressed
+import com.jump.browser.ui.theme.JumpRipple
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChromeIcon(
@@ -62,6 +101,23 @@ fun ChromeIcon(
 }
 
 @Composable
+fun Modifier.jumpClickable(
+    shape: Shape = RoundedCornerShape(18.dp),
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    return this
+        .clip(shape)
+        .clickable(
+            interactionSource = interaction,
+            indication = ripple(color = JumpRipple),
+            enabled = enabled,
+            onClick = onClick,
+        )
+}
+
+@Composable
 fun ChromeButton(
     icon: ImageVector,
     contentDescription: String?,
@@ -71,19 +127,11 @@ fun ChromeButton(
     size: Int = 22,
     onClick: () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     Box(
         modifier = modifier
             .size(48.dp)
             .alpha(if (enabled) 1f else 0.35f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (pressed && enabled) JumpPressed else Color.Transparent)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled,
-            ) { onClick() },
+            .jumpClickable(RoundedCornerShape(18.dp), enabled, onClick),
         contentAlignment = Alignment.Center,
     ) {
         ChromeIcon(icon, contentDescription, tint = tint, size = size)
@@ -109,24 +157,18 @@ fun PressableScale(
 @Composable
 fun TabCountBadge(
     count: Int,
-    index: Int,
     tint: Color,
     modifier: Modifier = Modifier,
 ) {
-    val multiple = count > 1
     Box(modifier = modifier.size(48.dp), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = ReferenceIcons.Tabs,
             contentDescription = null,
-            tint = tint.copy(alpha = if (multiple) 0.15f else 1f),
+            tint = tint,
             modifier = Modifier.size(22.dp),
         )
         Text(
-            text = when {
-                multiple -> "${index + 1}/$count"
-                count > 99 -> ":)"
-                else -> count.toString()
-            },
+            text = if (count > 99) ":)" else count.toString(),
             color = tint,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -137,15 +179,19 @@ fun TabCountBadge(
 
 @Composable
 fun Modifier.pressable(
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = RectangleShape,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ): Modifier {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     return this
-        .background(if (pressed && enabled) JumpPressed else Color.Transparent, shape)
-        .clickable(interactionSource = interaction, indication = null, enabled = enabled) { onClick() }
+        .clip(shape)
+        .clickable(
+            interactionSource = interaction,
+            indication = ripple(color = JumpRipple),
+            enabled = enabled,
+            onClick = onClick,
+        )
 }
 
 @Composable
@@ -254,14 +300,10 @@ fun MenuCell(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (pressed && enabled) JumpPressed else Color.Transparent)
-            .clickable(interactionSource = interaction, indication = null, enabled = enabled) { onClick() }
+            .jumpClickable(RoundedCornerShape(18.dp), enabled, onClick)
             .padding(start = 5.dp, top = 15.dp, end = 5.dp, bottom = 6.5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -291,7 +333,7 @@ fun ListRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .pressable { onClick() }
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -326,6 +368,125 @@ fun ListRow(
 
 
 @Composable
+fun JumpDialogButton(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier
+            .defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)
+            .jumpClickable(RoundedCornerShape(18.dp), enabled, onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        CompositionLocalProvider(
+            LocalTextStyle provides TextStyle(
+                color = if (enabled) JumpAccent else JumpAccent.copy(alpha = 0.38f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+            )
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun JumpTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String = "",
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Done,
+    onImeAction: (() -> Unit)? = null,
+    autoFocus: Boolean = false,
+) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) runCatching { focus.requestFocus() }
+    }
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = singleLine,
+        textStyle = TextStyle(
+            fontSize = 14.sp,
+            lineHeight = 19.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+        ),
+        cursorBrush = SolidColor(JumpAccent),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        keyboardActions = KeyboardActions(
+            onDone = { onImeAction?.invoke() },
+            onGo = { onImeAction?.invoke() },
+            onSearch = { onImeAction?.invoke() },
+            onNext = { onImeAction?.invoke() },
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .focusRequester(focus),
+        decorationBox = { inner ->
+            Column(Modifier.fillMaxWidth()) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (value.isEmpty() && placeholder.isNotEmpty()) {
+                        Text(
+                            placeholder,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    inner()
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(JumpPressed))
+            }
+        },
+    )
+}
+
+@Composable
+fun JumpCheckbox(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    label: String,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = onCheckedChange != null,
+            ) { onCheckedChange?.invoke(!checked) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(16.dp)
+                .clip(CircleShape)
+                .background(if (checked) JumpAccent else Color.Transparent)
+                .border(2.dp, if (checked) JumpAccent else JumpPressed, CircleShape),
+        )
+        Spacer(Modifier.width(24.dp))
+        Text(
+            label,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 fun JumpAlertDialog(
     onDismissRequest: () -> Unit,
     confirmButton: @Composable () -> Unit,
@@ -334,23 +495,150 @@ fun JumpAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(18.dp),
+    shape: Shape = RoundedCornerShape(16.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     tonalElevation: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismissRequest,
-        confirmButton = confirmButton,
-        modifier = modifier.border(1.dp, JumpPressed, shape),
-        dismissButton = dismissButton,
-        icon = icon,
-        title = title,
-        text = text,
-        shape = shape,
-        containerColor = containerColor,
-        tonalElevation = tonalElevation,
-        textContentColor = MaterialTheme.colorScheme.onBackground,
-        titleContentColor = MaterialTheme.colorScheme.onBackground,
-        iconContentColor = MaterialTheme.colorScheme.onBackground,
-    )
+    val scope = rememberCoroutineScope()
+    val scale = remember { Animatable(0.90f) }
+    val contentAlpha = remember { Animatable(0f) }
+    val drag = remember { Animatable(0f) }
+    var cardWidth by remember { mutableStateOf(0) }
+    var closing by remember { mutableStateOf(false) }
+
+    fun close() {
+        if (closing) return
+        closing = true
+        scope.launch {
+            contentAlpha.animateTo(0f, tween(120))
+            onDismissRequest()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        launch { contentAlpha.animateTo(1f, tween(120)) }
+        scale.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 520f))
+    }
+
+    Dialog(
+        onDismissRequest = { close() },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(window) {
+            window?.setDimAmount(0f)
+            window?.setWindowAnimations(0)
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .imePadding()
+                .background(Color.Black.copy(alpha = 0.40f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { close() },
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Surface(
+                modifier = modifier
+                    .fillMaxWidth(0.8f)
+                    .widthIn(max = 288.dp)
+                    .onSizeChanged { cardWidth = it.width }
+                    .offset { IntOffset(drag.value.roundToInt(), 0) }
+                    .graphicsLayer {
+                        scaleX = scale.value
+                        scaleY = scale.value
+                        alpha = contentAlpha.value
+                        translationY = (1f - scale.value) * 32.dp.toPx()
+                    }
+                    .border(0.dp, Color.Transparent)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                scope.launch {
+                                    if (drag.value > cardWidth * 0.46f) {
+                                        drag.animateTo(cardWidth.toFloat(), tween(180))
+                                        close()
+                                    } else {
+                                        drag.animateTo(0f, tween(
+                                            300,
+                                            easing = FastOutSlowInEasing,
+                                        ))
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch { drag.animateTo(0f, tween(300)) }
+                            },
+                        ) { change, amount ->
+                            change.consume()
+                            scope.launch {
+                                drag.snapTo((drag.value + amount).coerceIn(0f, cardWidth.toFloat()))
+                            }
+                        }
+                    },
+                shape = shape,
+                color = containerColor,
+                tonalElevation = tonalElevation,
+                shadowElevation = 0.dp,
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    icon?.let {
+                        Box(
+                            Modifier.fillMaxWidth().padding(top = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { it() }
+                    }
+                    title?.let {
+                        CompositionLocalProvider(
+                            LocalTextStyle provides TextStyle(
+                                fontSize = 16.sp,
+                                lineHeight = 21.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 6.dp),
+                            ) { it() }
+                        }
+                    }
+                    text?.let {
+                        CompositionLocalProvider(
+                            LocalTextStyle provides TextStyle(
+                                fontSize = 14.sp,
+                                lineHeight = 19.sp,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                                    .padding(top = if (title == null) 14.dp else 0.dp),
+                            ) { it() }
+                        }
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        dismissButton?.invoke()
+                        confirmButton()
+                    }
+                }
+            }
+        }
+    }
 }
