@@ -1254,3 +1254,238 @@ private fun dayLabel(day: LocalDate): String {
 private fun timeLabel(epoch: Long): String =
     Instant.ofEpochMilli(epoch).atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+
+@Composable
+fun ResourceSnifferScreen(
+    resources: List<com.jump.browser.browser.SniffedResource>,
+    onBack: () -> Unit,
+    onOpen: (String) -> Unit,
+    onDownload: (String) -> Unit,
+    onCopy: (String) -> Unit,
+) {
+    var filter by remember { mutableStateOf("All") }
+    val kinds = listOf("All", "Images", "Media", "Scripts", "Styles", "Other")
+    val shown = remember(resources, filter) {
+        resources.filter { r ->
+            val m = r.mime.lowercase()
+            when (filter) {
+                "Images" -> m.startsWith("image/")
+                "Media" -> m.startsWith("video/") || m.startsWith("audio/")
+                "Scripts" -> m.contains("javascript")
+                "Styles" -> m.contains("css")
+                "Other" -> !(m.startsWith("image/") || m.startsWith("video/") || m.startsWith("audio/") ||
+                    m.contains("javascript") || m.contains("css"))
+                else -> true
+            }
+        }
+    }
+    ScreenScaffold("Resource sniffer", onBack) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                kinds.forEach { kind ->
+                    val selected = kind == filter
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+                                else Color.Transparent,
+                            )
+                            .border(
+                                1.dp,
+                                if (selected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                RoundedCornerShape(16.dp),
+                            )
+                            .clickable { filter = kind }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                    ) {
+                        Text(kind, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                    }
+                }
+            }
+            if (shown.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "No resources captured yet",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(shown, key = { it.url }) { resource ->
+                        ResourceRow(
+                            resource = resource,
+                            onOpen = { onOpen(resource.url) },
+                            onDownload = { onDownload(resource.url) },
+                            onCopy = { onCopy(resource.url) },
+                        )
+                        DividerLine()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResourceRow(
+    resource: com.jump.browser.browser.SniffedResource,
+    onOpen: () -> Unit,
+    onDownload: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onOpen() }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Text(
+            resource.url.substringAfterLast('/').ifBlank { resource.url },
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "${resource.mime.ifBlank { "unknown" }}  ·  ${resource.url}",
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Text("Open", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onOpen() })
+            Text("Download", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onDownload() })
+            Text("Copy link", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { onCopy() })
+        }
+    }
+}
+
+@Composable
+fun NetworkLogScreen(
+    entries: List<com.jump.browser.browser.NetworkEntry>,
+    onBack: () -> Unit,
+    onClear: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    ScreenScaffold(
+        title = "Network log",
+        onBack = onBack,
+        actions = {
+            Text(
+                "Clear",
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .pressable { onClear() }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        },
+    ) {
+        if (entries.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No requests recorded", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(entries) { entry ->
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpen(entry.url) }
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                if (entry.blocked) "BLOCKED" else "${entry.status}",
+                                fontSize = 12.sp,
+                                color = if (entry.blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                entry.mime.ifBlank { "unknown" },
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(entry.time, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            entry.url,
+                            fontSize = 13.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Text(
+                            "${entry.durationMs} ms",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    DividerLine()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SavedPagesScreen(
+    pages: List<java.io.File>,
+    onBack: () -> Unit,
+    onOpen: (java.io.File) -> Unit,
+    onDelete: (java.io.File) -> Unit,
+) {
+    ScreenScaffold("Saved pages", onBack) {
+        if (pages.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No saved pages", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(pages, key = { it.absolutePath }) { file ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpen(file) }
+                            .padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                file.nameWithoutExtension.replace('_', ' '),
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                "${file.length() / 1024} KB",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        ChromeButton(ReferenceIcons.ClearData, "Delete", size = 20) { onDelete(file) }
+                    }
+                    DividerLine()
+                }
+            }
+        }
+    }
+}

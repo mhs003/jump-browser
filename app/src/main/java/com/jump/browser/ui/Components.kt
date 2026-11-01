@@ -311,15 +311,17 @@ fun MenuCell(
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(7.75.dp))
-        Text(
-            label,
-            color = tint,
-            fontSize = 12.sp,
-            lineHeight = 13.sp,
+        BasicText(
+            text = label,
+            style = TextStyle(
+                color = tint,
+                fontSize = 12.sp,
+                lineHeight = 13.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            ),
             minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }

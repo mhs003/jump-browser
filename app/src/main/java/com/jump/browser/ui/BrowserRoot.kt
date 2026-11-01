@@ -92,7 +92,7 @@ import com.jump.browser.ui.theme.JumpScrim
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
-private enum class LibraryPage { NONE, RECORDS, DOWNLOADS, SETTINGS }
+private enum class LibraryPage { NONE, RECORDS, DOWNLOADS, SETTINGS, SNIFFER, NETWORK, SAVED }
 
 @Composable
 fun BrowserRoot(
@@ -123,6 +123,8 @@ fun BrowserRoot(
     var showTabs by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(LibraryPage.NONE) }
     var shownPage by remember { mutableStateOf(LibraryPage.NONE) }
+    var savedPages by remember { mutableStateOf(emptyList<java.io.File>()) }
+    var tts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
     var recordsTab by remember { mutableIntStateOf(0) }
     var reader by remember { mutableStateOf<ReaderData?>(null) }
     var source by remember { mutableStateOf<String?>(null) }
@@ -146,6 +148,14 @@ fun BrowserRoot(
         controller.isDarkTheme = dark
     }
 
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+        }
+    }
+
     LaunchedEffect(homeDip) {
         if (homeDip) {
             kotlinx.coroutines.delay(160)
@@ -162,6 +172,7 @@ fun BrowserRoot(
     }
 
     fun closeAllOverlays() {
+        controller.stopResourceSniffing()
         titleMenu = false
         showMenu = false
         showTabs = false
@@ -497,21 +508,45 @@ fun BrowserRoot(
                             source = html
                         }
                     }
-                    MenuAction.SAVED_PAGES -> { recordsTab = 2; openPage(LibraryPage.RECORDS) }
+                    MenuAction.SAVED_PAGES -> {
+                        savedPages = loadSavedPages(context)
+                        openPage(LibraryPage.SAVED)
+                    }
                     MenuAction.FULLSCREEN -> immersive = !immersive
                     MenuAction.SHOW_IMAGES -> {
                         container.settings.update { it.copy(loadImages = !it.loadImages) }
                         controller.applySettingsToAll()
                         controller.reload()
                     }
-                    MenuAction.RESOURCE_SNIFFER -> JumpToast.show(context, "Resource sniffer is not available")
+                    MenuAction.RESOURCE_SNIFFER -> {
+                        controller.startResourceSniffing()
+                        openPage(LibraryPage.SNIFFER)
+                    }
                     MenuAction.USER_AGENT -> {
                         if (active?.url == null) JumpToast.show(context, "Open a page first")
                         else controller.setDesktopMode(active.desktopMode.not())
                     }
-                    MenuAction.NETWORK_LOG -> JumpToast.show(context, "Network log is empty")
+                    MenuAction.NETWORK_LOG -> {
+                        controller.startResourceSniffing()
+                        openPage(LibraryPage.NETWORK)
+                    }
                     MenuAction.SCAN_QR -> qrScreen = true
-                    MenuAction.READ_ALOUD -> JumpToast.show(context, "Read aloud is not available for this page")
+                    MenuAction.READ_ALOUD -> {
+                        if (tts != null) {
+                            tts?.stop()
+                            tts?.shutdown()
+                            tts = null
+                            JumpToast.show(context, "Stopped reading aloud")
+                        } else {
+                            controller.readPageAloud { data ->
+                                if (data == null || data.text.isBlank()) {
+                                    JumpToast.show(context, "Nothing to read on this page")
+                                } else {
+                                    tts = startReadingAloud(context, data.text)
+                                }
+                            }
+                        }
+                    }
                     MenuAction.AI -> JumpToast.show(context, "AI is not enabled")
                     MenuAction.ORIENTATION -> JumpToast.show(context, "Orientation follows the system")
                     MenuAction.AD_BLOCK -> {
@@ -519,7 +554,7 @@ fun BrowserRoot(
                         controller.applySettingsToAll()
                         controller.reload()
                     }
-                    MenuAction.MARK_AD -> JumpToast.show(context, "Ad rule added for this site")
+                    MenuAction.MARK_AD -> controller.markSiteAsAdFree()
                     MenuAction.TEXT_SIZE -> openPage(LibraryPage.SETTINGS)
                     MenuAction.CLEAR_DATA -> clearDataDialog = true
                     MenuAction.CUSTOMIZE_MENU -> JumpToast.show(context, "Menu customization is not available")
@@ -616,6 +651,31 @@ fun BrowserRoot(
                         onOpen = { openDownload(context, it) },
                         onDelete = { container.downloads.remove(it) },
                         onClearCompleted = { container.downloads.clearCompleted() },
+                    )
+                    LibraryPage.SNIFFER -> ResourceSnifferScreen(
+                        resources = controller.sniffedResources,
+                        onBack = { page = LibraryPage.NONE },
+                        onOpen = { controller.navigate(it); page = LibraryPage.NONE },
+                        onDownload = { controller.downloadUrl(it) },
+                        onCopy = { controller.copyUrl(it) },
+                    )
+                    LibraryPage.NETWORK -> NetworkLogScreen(
+                        entries = controller.networkEntries,
+                        onBack = { page = LibraryPage.NONE },
+                        onClear = { controller.clearNetworkLog() },
+                        onOpen = { controller.copyUrl(it) },
+                    )
+                    LibraryPage.SAVED -> SavedPagesScreen(
+                        pages = savedPages,
+                        onBack = { page = LibraryPage.NONE },
+                        onOpen = { file ->
+                            page = LibraryPage.NONE
+                            controller.loadUrl("file://${file.absolutePath}")
+                        },
+                        onDelete = {
+                            it.delete()
+                            savedPages = loadSavedPages(context)
+                        },
                     )
                     LibraryPage.SETTINGS -> SettingsScreen(
                         settings = settings,
@@ -1094,6 +1154,39 @@ private fun SiteInfoAction(label: String, onClick: () -> Unit) {
             .pressable { onClick() }
             .padding(horizontal = 16.dp, vertical = 13.dp),
     )
+}
+
+private fun loadSavedPages(context: Context): List<java.io.File> {
+    val dir = java.io.File(context.filesDir, "saved_pages")
+    return dir.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() }.orEmpty()
+}
+
+private fun startReadingAloud(
+    context: Context,
+    text: String,
+): android.speech.tts.TextToSpeech? {
+    var engine: android.speech.tts.TextToSpeech? = null
+    engine = android.speech.tts.TextToSpeech(context) { status ->
+        if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+            val result = engine?.setLanguage(java.util.Locale.getDefault())
+            if (result == android.speech.tts.TextToSpeech.LANG_MISSING_DATA ||
+                result == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+                engine?.setLanguage(java.util.Locale.US)
+            }
+            engine?.setSpeechRate(1.0f)
+            val chunks = text.chunked(3500)
+            chunks.forEachIndexed { index, chunk ->
+                val mode = if (index == 0) android.speech.tts.TextToSpeech.QUEUE_FLUSH
+                else android.speech.tts.TextToSpeech.QUEUE_ADD
+                engine?.speak(chunk, mode, null, "jump-$index")
+            }
+            JumpToast.show(context, "Reading aloud")
+        } else {
+            JumpToast.show(context, "Text-to-speech is not available")
+        }
+    }
+    return engine
 }
 
 @Composable

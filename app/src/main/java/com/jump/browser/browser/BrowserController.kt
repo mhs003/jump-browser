@@ -49,6 +49,9 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicLong
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class TabInfo(
     val id: Long,
@@ -75,6 +78,27 @@ data class ReaderData(
     val url: String,
 )
 
+data class NetworkEntry(
+    val method: String,
+    val url: String,
+    val mime: String,
+    val status: Int,
+    val startedAt: Long,
+    val finishedAt: Long,
+    val blocked: Boolean = false,
+) {
+    val durationMs: Long get() = (finishedAt - startedAt).coerceAtLeast(0)
+    val host: String get() = runCatching { android.net.Uri.parse(url).host ?: url }.getOrDefault(url)
+    val time: String
+        get() = if (startedAt <= 0) "" else SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(startedAt))
+}
+
+data class SniffedResource(
+    val url: String,
+    val mime: String,
+    val size: Long,
+)
+
 data class WebContextMenu(
     val linkUrl: String?,
     val imageUrl: String?,
@@ -98,6 +122,12 @@ class BrowserController(
     private var host: FrameLayout? = null
     private var attached: WebView? = null
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private var networkLogging = false
+    private val networkStart = HashMap<String, Long>()
+    var networkEntries by mutableStateOf<List<NetworkEntry>>(emptyList())
+        private set
+    var sniffedResources by mutableStateOf<List<SniffedResource>>(emptyList())
+        private set
 
     var tabs by mutableStateOf<List<TabInfo>>(emptyList())
         private set
@@ -647,6 +677,100 @@ class BrowserController(
 
     fun getWebView(): WebView? = activeWebView()
 
+    /** Resource sniffer runs while the panel is open only. */
+    fun startResourceSniffing() {
+        sniffedResources = emptyList()
+        networkStart.clear()
+        networkLogging = true
+    }
+
+    fun stopResourceSniffing() {
+        networkLogging = false
+    }
+
+    fun clearNetworkLog() {
+        networkEntries = emptyList()
+    }
+
+    private fun noteRequest(url: String?, method: String?) {
+        if (!networkLogging || url == null || method == null) return
+        if (method != "GET" && method != "POST") return
+        networkStart[url] = System.currentTimeMillis()
+    }
+
+    private fun noteResponse(url: String?, mime: String?, status: Int, blocked: Boolean = false) {
+        if (!networkLogging || url == null) return
+        val now = System.currentTimeMillis()
+        val started = networkStart.remove(url) ?: now
+        if (!url.startsWith("http")) return
+        val entry = NetworkEntry(
+            method = if (blocked) "BLOCK" else "GET",
+            url = url,
+            mime = mime.orEmpty(),
+            status = status,
+            startedAt = started,
+            finishedAt = now,
+            blocked = blocked,
+        )
+        val m = mime.orEmpty().lowercase()
+        val sniffable = sniffableMime(m, url)
+        if (sniffable) {
+            val guess = resourceSize(status)
+            if (sniffedResources.none { it.url == url }) {
+                sniffedResources = (sniffedResources + SniffedResource(url, m, guess)).takeLast(500)
+            }
+        }
+        networkEntries = (listOf(entry) + networkEntries).take(400)
+    }
+
+    private fun applyAdBlocking(view: WebView) {
+        val host = UrlUtils.host(view.url)
+        if (AdBlocker.isSiteException(host)) {
+            view.evaluateJavascript(
+                "(function(){var s=document.getElementById('via-ad-css');if(s)s.remove();})()",
+                null,
+            )
+        } else if (app.settings.settings.adBlock) {
+            injectCosmeticCss(view)
+        }
+    }
+
+    private fun injectCosmeticCss(view: WebView) {
+        view.evaluateJavascript(
+            "(function(){if(!document.getElementById('via-ad-css')){var s=document.createElement('style');" +
+                "s.id='via-ad-css';s.textContent=${JSONObject.quote(AdBlocker.cosmeticCss)};document.documentElement.appendChild(s);}})()",
+            null,
+        )
+    }
+
+    private fun sniffableMime(mime: String, url: String): Boolean {
+        if (mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/")) return true
+        if (mime.contains("javascript") || mime.contains("css") || mime.contains("font")) return true
+        if (mime.startsWith("application/")) return true
+        val ext = url.substringBefore('?').substringAfterLast('.', "").lowercase()
+        return ext in setOf("jpg", "jpeg", "png", "gif", "webp", "svg", "ico", "mp4", "webm", "m3u8",
+            "mp3", "ogg", "wav", "js", "css", "woff", "woff2", "ttf", "otf", "json", "wasm")
+    }
+
+    /** WebView does not expose response sizes; the panel shows the transfer as unavailable when anonymous. */
+    private fun resourceSize(status: Int): Long = if (status in 200..299) -1L else 0L
+
+    /** Persist exceptions to cosmetic ad blocking for the active site. */
+    fun markSiteAsAdFree() {
+        val host = activeTab?.url?.let { runCatching { Uri.parse(it).host }.getOrNull() }
+        if (host.isNullOrBlank()) {
+            notify("Open a page first")
+            return
+        }
+        AdBlocker.addSiteException(host)
+        activeWebView()?.let { applyAdBlocking(it) }
+        notify("Ad blocking disabled for this site")
+    }
+
+    fun adBlockingException(): String? = activeTab?.url?.let { url ->
+        runCatching { Uri.parse(url).host }.getOrNull()
+    }
+
     private inner class ViaClient(private val id: Long) : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
             val url = request?.url?.toString() ?: return false
@@ -690,8 +814,10 @@ class BrowserController(
             request: WebResourceRequest?,
         ): WebResourceResponse? {
             val url = request?.url?.toString()
+            noteRequest(url, request?.method)
             if (app.settings.settings.adBlock && request?.method == "GET" && AdBlocker.isBlocked(url)) {
                 adBlockedCount += 1
+                noteResponse(url, "blocked", 0, blocked = true)
                 return WebResourceResponse(
                     "text/plain",
                     "utf-8",
@@ -702,6 +828,15 @@ class BrowserController(
                 )
             }
             return null
+        }
+
+        override fun onReceivedHttpError(
+            view: WebView?,
+            request: WebResourceRequest?,
+            errorResponse: WebResourceResponse?,
+        ) {
+            super.onReceivedHttpError(view, request, errorResponse)
+            noteResponse(request?.url?.toString(), errorResponse?.mimeType, errorResponse?.statusCode ?: 0)
         }
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -745,13 +880,7 @@ class BrowserController(
                     null,
                 )
             }
-            if (app.settings.settings.adBlock) {
-                view.evaluateJavascript(
-                    "(function(){if(!document.getElementById('via-ad-css')){var s=document.createElement('style');" +
-                        "s.id='via-ad-css';s.textContent=${JSONObject.quote(AdBlocker.cosmeticCss)};document.documentElement.appendChild(s);}})()",
-                    null,
-                )
-            }
+            applyAdBlocking(view)
             if (sessions[id]?.info?.incognito != true) {
                 app.history.record(view.title ?: "", url)
             }
@@ -1089,6 +1218,11 @@ class BrowserController(
             val decoded = runCatching { JSONTokener(value).nextValue() as? String }.getOrNull()
             callback(decoded ?: value ?: "")
         }
+    }
+
+    /** Extracts readable text and returns it to the caller for TTS. */
+    fun readPageAloud(callback: (ReaderData?) -> Unit) {
+        extractReader(callback)
     }
 
     fun printPage() {

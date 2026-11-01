@@ -80,10 +80,23 @@ object AdBlocker {
         "moatpixel.com",
     )
 
+    /** Sites the user explicitly excluded with "Mark as ad" -> "Not an ad". */
+    private val exceptions = LinkedHashSet<String>()
+
+    fun addSiteException(host: String?) {
+        if (host.isNullOrBlank()) return
+        synchronized(exceptions) { exceptions.add(host.lowercase()) }
+    }
+
+    fun isSiteException(host: String?): Boolean {
+        if (host.isNullOrBlank()) return false
+        return synchronized(exceptions) { host.lowercase() in exceptions }
+    }
+
     fun isBlocked(url: String?): Boolean {
         if (url == null) return false
         val host = UrlUtils.host(url).lowercase()
-        if (host.isEmpty()) return false
+        if (host.isEmpty() || isSiteException(host)) return false
         return hosts.any { blocked -> host == blocked || host.endsWith(".$blocked") }
     }
 

@@ -557,7 +557,7 @@ private fun menuPages(
         MenuEntry("Incognito\nmode", ReferenceIcons.MenuIncognito, MenuAction.INCOGNITO, incognitoNow),
         MenuEntry("Share", ReferenceIcons.Share, MenuAction.SHARE),
         MenuEntry(if (bookmarked) "Edit\nbookmark" else "Add\nbookmark", ReferenceIcons.AddBookmark, MenuAction.ADD_BOOKMARK, bookmarked),
-        MenuEntry("Desktop site", ReferenceIcons.Desktop, MenuAction.DESKTOP, desktopNow),
+        MenuEntry("Desktop\nsite", ReferenceIcons.Desktop, MenuAction.DESKTOP, desktopNow),
         MenuEntry("Tools", ReferenceIcons.Tools, MenuAction.TOOLS),
         MenuEntry("Settings", ReferenceIcons.Settings, MenuAction.SETTINGS),
     )
