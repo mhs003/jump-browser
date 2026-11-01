@@ -89,13 +89,21 @@ and 24dp for menu cells. This preserves the source stroke weight and exact
 silhouette instead of approximating icons with Material assets. Generic symbols
 that the reference does not expose as glyphs remain in `JumpIcons.kt`.
 
-### Feedback
+### Feedback and transient UI
 
-Ripple is deliberately absent from the browser chrome, scrims, sheets, tabs,
-list rows and address backdrop, matching the reference pressed-background
-behavior. Pressed chrome controls use a rounded `#30808080` overlay. Material
-dialog buttons are the exception and keep their ripple because the reference
-dialogs use ripple buttons.
+Interactive chrome controls, menu cells, toolbar slots, tab rows, suggestion
+rows and settings rows use the reference `#30808080` ripple, clipped by the
+control's own shape. Scrims and backdrops—including the address backdrop—use an
+explicit null indication so tapping outside closes the overlay without a flash.
+Dialog buttons retain the same ripple.
+
+Dialogs are native Compose dialogs rather than Material `AlertDialog`: a 288dp
+card, 16dp radius, 16sp bold title, 14sp body, underlined 14sp fields, 14sp
+accent actions, a 0.40 black scrim, and horizontal drag-to-dismiss. The
+reference's small round checkbox is reproduced for dialog options. Short
+messages go through `JumpToastHost` instead of `android.widget.Toast`: a
+`#CC1E1E1E` pill with a 30dp radius, 14sp white text, optional accent action,
+1.6s duration (3.5s with an action), and a 180ms 20dp rise/fall.
 
 ### UI composition
 
@@ -103,13 +111,14 @@ dialogs use ripple buttons.
 
 ```
 status inset
-title bar / address bar
+title bar / address bar / full-screen address editor
 2dp progress overlay
 WebView host + homepage/error page + suggestion dropdown + find bar
 bottom bar
 menu sheet (overlay)
 tab popup (overlay)
 library / reader / source screens (animated overlays)
+reference toast host
 dialogs
 ```
 
@@ -117,7 +126,11 @@ The WebView host is always present under the chrome, so opening the library or
 menu does not destroy or reload the page. Overlays are full-size surfaces with
 their own status-inset handling. Reader mode is rendered inside the page area,
 so the title bar, page security state and bottom toolbar remain visible, as in
-the reference.
+the reference. The address editor has two layouts: the inline 48dp row, and a
+full-screen white editor that temporarily replaces the chrome while preserving
+the keyboard. Settings keeps a single page stack: entering a category slides
+the new page in from the right while the previous page stops at a 30% offset;
+the gesture is interactive and settles at the reference 46% threshold.
 
 ## Layout rhythm
 
@@ -131,6 +144,9 @@ the reference.
 | Menu sheet | 5 columns × 2 rows, 304dp total |
 | Tab popup row | 48dp |
 | Library top bar | 48dp |
+| Settings top bar | 54dp |
+| Settings title | 20sp bold |
+| Settings category row | 59dp |
 | Horizontal padding | 16–20dp |
 
 The bottom bar adds the navigation-bar inset outside its 48dp content height.
@@ -151,13 +167,20 @@ Motion is part of the product, not decoration.
 | Menu sheet | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
 | Tab popup scrim | 160ms fade, 25% dim | 160ms fade |
 | Tab popup panel | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
-| Library screens | 220ms horizontal slide (30%) | 220ms horizontal slide |
+| Library/settings page enter | 220ms: new page from 100% right, old page to −30% left | — |
+| Library/settings page back | 220ms: previous page from −30% left, current page to 100% right | — |
+| Interactive page swipe | Page follows finger; 46% threshold | 300ms settle if released early |
+| Dialog enter | 240ms bounce, 90%→100% scale + 20dp rise + fade | 120ms fade |
+| Toast | 180ms fade + 20dp rise | 180ms fade + 20dp fall |
 | Context menu | 100ms fade | 100ms fade |
 
 Movement uses an accelerating curve for bottom sheets and popups, matching the
-reference window animations. Page indicator and menu paging use the horizontal
-pager's own spring. The homepage search gesture translates content down by
-72dp and fades it to 10% before opening the address overlay.
+reference window animations. Settings and library pages use the reference
+accelerate/decelerate 220ms fragment transition, including an interactive
+left-to-right back gesture with the current page tracking the finger. Page
+indicator and menu paging use the horizontal pager's own spring. The homepage
+search gesture translates content down by 72dp and fades it to 10% before
+opening the address overlay.
 
 ## Extension points
 

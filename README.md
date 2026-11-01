@@ -19,14 +19,20 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
 - **Homepage.** Jump's own three-ribbon mark, search field, and bookmark
   shortcuts. The homepage is native Compose, not generated HTML.
 - **Blueprint address bar.** Inline editing with automatic selection, URL/search
-  detection, local and remote suggestions, clear/go actions, and an expand
-  affordance.
+  detection, local and remote suggestions, clear/go actions, and a true
+  full-screen editing mode that keeps the keyboard attached.
 - **Paged menu.** The two-row, five-column action sheet with animated page
   transitions, page dots, and the familiar exit affordance.
 - **Library.** Bookmarks with icons, editable entries and a search field;
   grouped, searchable history; and a download manager built on Android's
   DownloadManager.
-- **Reader mode.** Article extraction with a typography-focused reader surface.
+- **Reader mode.** Article extraction with a typography-focused reader surface
+  inside the live page area, so the title bar and bottom toolbar stay present.
+- **Animated settings navigation.** Settings pages enter from the right while
+  the outgoing page moves left, and can be dragged back from left to right with
+  the page tracking the finger. Dialogs use the same horizontal dismiss gesture.
+- **Reference toast surface.** Short messages use Jump's own bottom pill instead
+  of the platform toast, with the reference geometry, duration and action slot.
 - **Find in page.** Live match count with previous/next navigation.
 - **QR scanner.** CameraX preview with ZXing decoding, plus a clipboard
   fallback.
@@ -35,16 +41,16 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
   controls, and one-tap browsing-data clearing.
 - **Desktop mode, share, copy, save page, print, view source, translate, and
   home-screen shortcuts.**
-- **Reference feedback language.** Chrome, sheets and list rows use the
-  reference pressed-background treatment without ripple; dialog buttons retain
-  the reference ripple.
+- **Reference feedback language.** Interactive chrome controls, menu cells,
+  list rows and toolbar slots use the reference `#30808080` ripple. Scrims and
+  backdrops never ripple, and dialog buttons keep their ripple.
 
 ## Screens
 
 | | |
 |---|---|
 | ![Homepage](docs/screenshots/home.png) | ![Address bar](docs/screenshots/address-bar.png) |
-| **Homepage** with the reference geometry and logo. | **Address bar** with live suggestions and page scrim. |
+| **Homepage** with the reference geometry and logo. | **Address bar** with the inline editor, search placeholder and page scrim. |
 | ![Menu](docs/screenshots/menu.png) | ![Tabs](docs/screenshots/tabs.png) |
 | **Action sheet** with paged tools. | **Compact tab popup** anchored to the toolbar. |
 | ![Settings](docs/screenshots/settings.png) | ![Settings detail](docs/screenshots/settings-general.png) |
@@ -55,6 +61,7 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
 | **Download manager.** | **Long-press link and image actions.** |
 
 More captures: [bookmarks and history](docs/screenshots/bookmarks.png),
+[full-screen address](docs/screenshots/address-fullscreen.png),
 [night mode](docs/screenshots/night-mode.png).
 
 ## Architecture
@@ -87,8 +94,10 @@ Debug builds are written to `app/build/outputs/apk/debug/app-debug.apk`.
 Minified release builds are written to `app/build/outputs/apk/release/app-release.apk`.
 
 A signed, installable release is included at `dist/Jump-1.0.0.apk` with checksums
-in `dist/SHA256SUMS.txt`. It is signed with the local debug key so it can be
-sideloaded; use a private release key before publishing to a store.
+in `dist/SHA256SUMS.txt`. Rebuild it with `tad build release` after source
+changes. It is signed with the local debug key so it can be sideloaded; use a
+private release key before publishing to a store. Development happens on the
+`master` branch.
 
 ## Project layout
 
@@ -110,9 +119,9 @@ The signed release is 2.2 MB.
 
 Known gaps: incognito tabs suppress history without isolating cookies because
 Android WebView profiles are only available on newer WebView providers.
-Bookmarks are flat rather than folder-based, and saved-page management is
-limited to the save action and a confirmation toast. These are deliberate
-extension points, not hidden behavior.
+Bookmarks are flat rather than folder-based, and saved-page management is still
+limited. Advanced data panels such as the resource sniffer, network log and
+read-aloud engine remain extension points rather than hidden implementations.
 
 ## License
 
