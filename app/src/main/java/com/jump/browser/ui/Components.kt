@@ -283,7 +283,7 @@ fun DividerLine(modifier: Modifier = Modifier) {
 fun Dot(selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .padding(horizontal = 4.dp, vertical = 7.dp)
+            .padding(horizontal = 4.dp, vertical = 6.dp)
             .size(4.dp)
             .clip(CircleShape)
             .background(

@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -569,8 +570,8 @@ fun MenuOverlay(
         ) {
             AnimatedVisibility(
                 visible = visible,
-                enter = slideInVertically(tween(160, easing = FastOutLinearInEasing)) { slidePx } + fadeIn(tween(160)),
-                exit = slideOutVertically(tween(160, easing = FastOutLinearInEasing)) { slidePx } + fadeOut(tween(160)),
+                enter = slideInVertically(tween(220, easing = FastOutLinearInEasing)) { slidePx } + fadeIn(tween(220)),
+                exit = slideOutVertically(tween(220, easing = FastOutLinearInEasing)) { slidePx } + fadeOut(tween(180)),
                 modifier = Modifier
                     .padding(horizontal = 1.dp)
                     .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() }),
@@ -699,7 +700,7 @@ private fun MenuSheetContent(
                 }
             }
             Row(
-                Modifier.fillMaxWidth().height(12.dp),
+                Modifier.fillMaxWidth().height(14.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -712,7 +713,8 @@ private fun MenuSheetContent(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(48.dp)
+                    .offset(y = (-14).dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.weight(1f))

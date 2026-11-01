@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -102,7 +103,7 @@ fun JumpToastHost(modifier: Modifier = Modifier) {
     Box(
         modifier
             .fillMaxSize()
-            .padding(bottom = 120.dp),
+            .padding(bottom = with(density) { 76.dp }),
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(
@@ -120,29 +121,32 @@ fun JumpToastHost(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Text(
-                    data.text,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    lineHeight = 19.sp,
-                    textAlign = TextAlign.Start,
+                BasicText(
+                    text = data.text,
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start,
+                    ),
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .padding(vertical = 13.dp),
+                        .padding(vertical = 9.dp),
                 )
                 data.action?.let { label ->
-                    Text(
-                        label,
-                        color = JumpAccent,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                    BasicText(
+                        text = label,
+                        style = TextStyle(
+                            color = JumpAccent,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
                         modifier = Modifier
                             .clip(RoundedCornerShape(18.dp))
                             .jumpClickable {
                                 data.onAction?.invoke()
                                 JumpToast.dismiss()
                             }
-                            .padding(horizontal = 16.dp, vertical = 13.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
                 if (data.action == null) {
