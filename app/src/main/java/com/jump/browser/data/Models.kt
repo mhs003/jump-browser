@@ -168,6 +168,7 @@ data class AppSettings(
     val toolbarLayout: String = "ADDRESS_FIRST", // ADDRESS_FIRST, TITLE_AND_ADDRESS
     val toolbarSearch: Boolean = true,
     val customizeMenu: List<String> = emptyList(),
+    val userAgent: String = "",
 ) {
     val searchEngine: SearchEngine
         get() {

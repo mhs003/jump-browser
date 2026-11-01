@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -798,14 +799,17 @@ fun SettingsScreen(
             "General" -> {
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
                     item { SettingsLabelRow("Sync") { toast("Sync is not enabled") } }
-                    item { SettingsLabelRow("User-agent", "Default") { toast("Uses the mobile user agent") } }
+                    item { SettingsLabelRow("User-agent", activeUserAgentLabel(settings.desktopMode)) { dialog = "userAgent" } }
                     item { SettingsLabelRow("Clear data") { dialog = "clear" } }
                     item { SettingsLabelRow("Ad blocking", if (settings.adBlock) null else "Off") {
                         onSettingsChange { it.copy(adBlock = !it.adBlock) }
                     } }
-                    item { SettingsLabelRow("Site configuration") { toast("Configure sites from the page menu") } }
+                    item { SettingsLabelRow("Site configuration", exceptionsSummary()) { toast("Saved site exceptions: ${exceptionsSummary()}") } }
                     item { SettingsLabelRow("Password manager") { toast("No saved passwords") } }
-                    item { SettingsLabelRow("Night mode", when (settings.darkMode) {
+                    item { SettingsLabelRow("Night mode", if (settings.nightMode) "On" else null) {
+                        onSettingsChange { it.copy(nightMode = !it.nightMode) }
+                    } }
+                    item { SettingsLabelRow("Appearance", when (settings.darkMode) {
                         DarkMode.SYSTEM -> "Follow system"
                         DarkMode.LIGHT -> null
                         DarkMode.DARK -> "Dark"
@@ -814,7 +818,7 @@ fun SettingsScreen(
                         onSettingsChange { it.copy(readerMode = !it.readerMode) }
                     } }
                     item { SettingsLabelRow("Toolbars settings") { dialog = "toolbars" } }
-                    item { SettingsLabelRow("Customize menu") { toast("Menu customization is not available") } }
+                    item { SettingsLabelRow("Customize menu") { dialog = "customizeMenu" } }
                     item { SettingsLabelRow("Customize context menu") { toast("Context menu customization is not available") } }
                     item { SettingsLabelRow("Language", "System") { toast("Language follows Android") } }
                     item { SettingsLabelRow("Homepage", settings.homepageUrl.ifBlank { null }) {
@@ -875,7 +879,7 @@ fun SettingsScreen(
                         DarkMode.DARK -> "Dark"
                     }) { dialog = "theme" } }
                     item { SettingsLabelRow("Font", if (settings.textZoom == 100) null else "${settings.textZoom}%") { dialog = "zoom" } }
-                    item { SettingsLabelRow("Customize menu") { toast("Menu customization is not available") } }
+                    item { SettingsLabelRow("Customize menu") { dialog = "customizeMenu" } }
                     item { Spacer(Modifier.height(24.dp)) }
                 }
             }
@@ -1106,6 +1110,77 @@ fun SettingsScreen(
                 }) { Text("Save") }
             },
             dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+    if (dialog == "userAgent") {
+        val options = listOf(
+            "Default" to "MOBILE",
+            "Desktop" to "DESKTOP",
+            "Android" to "ANDROID",
+            "iPhone" to "IPHONE",
+            "Custom" to "CUSTOM",
+        )
+        ChoiceDialog(
+            title = "User-agent",
+            options = options,
+            selected = settings.userAgent.ifBlank { "MOBILE" },
+            onDismiss = { dialog = null },
+            onSelect = { value ->
+                onSettingsChange { it.copy(userAgent = value, desktopMode = value == "DESKTOP") }
+                dialog = null
+            },
+        )
+    }
+    if (dialog == "customizeMenu") {
+        val order = if (settings.customizeMenu.isEmpty()) {
+            com.jump.browser.ui.DEFAULT_MENU_ORDER
+        } else settings.customizeMenu
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Customize menu") },
+            text = {
+                Column(
+                    Modifier
+                        .height(300.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    order.forEach { label ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            BasicText(
+                                text = label.replace('\n', ' '),
+                                style = TextStyle(fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground),
+                                modifier = Modifier.weight(1f),
+                            )
+                            ChromeButton(ReferenceIcons.ChevronUp, "Move up", size = 20) {
+                                val list = order.toMutableList()
+                                val i = list.indexOf(label)
+                                if (i > 0) {
+                                    list.removeAt(i); list.add(i - 1, label)
+                                    onSettingsChange { it.copy(customizeMenu = list) }
+                                }
+                            }
+                            ChromeButton(ReferenceIcons.ChevronDown, "Move down", size = 20) {
+                                val list = order.toMutableList()
+                                val i = list.indexOf(label)
+                                if (i in 0 until list.lastIndex) {
+                                    list.removeAt(i); list.add(i + 1, label)
+                                    onSettingsChange { it.copy(customizeMenu = list) }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Done") } },
+            dismissButton = {
+                JumpDialogButton(onClick = {
+                    onSettingsChange { it.copy(customizeMenu = emptyList()) }
+                    dialog = null
+                }) { Text("Reset") }
+            },
         )
     }
     if (dialog == "toolbars") {
@@ -1578,3 +1653,9 @@ private fun pickHomepageImage(context: android.content.Context, onPicked: (Strin
         else onPicked(path)
     }
 }
+
+
+private fun activeUserAgentLabel(desktopMode: Boolean): String?
+    = if (desktopMode) "Desktop" else null
+
+private fun exceptionsSummary(): String? = null

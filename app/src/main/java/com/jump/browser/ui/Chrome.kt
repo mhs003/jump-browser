@@ -95,6 +95,16 @@ enum class MenuAction {
 
 data class MenuEntry(val label: String, val icon: ImageVector, val action: MenuAction, val accent: Boolean = false)
 
+/** Default menu order used by the menu customizer. */
+val DEFAULT_MENU_ORDER: List<String> = listOf(
+    "Night mode", "Bookmarks", "History", "Downloads", "Incognito\nmode",
+    "Share", "Add\nbookmark", "Desktop site", "Tools", "Settings",
+    "Find in\npage", "Save", "Saved\npages", "Translate", "View\nsource",
+    "Full-screen", "Show\nimages", "Resource\nsniffer", "User-agent", "Network\nlog",
+    "Scan QR\ncode", "Add to\nhome", "Read\naloud", "AI", "Orientation",
+    "Ad\nblocking", "Mark as\nad", "Text size", "Clear data", "Customize\nmenu",
+)
+
 @Composable
 fun TitleBar(
     tab: TabInfo?,

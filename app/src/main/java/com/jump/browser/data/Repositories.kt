@@ -42,6 +42,7 @@ class SettingsRepository(private val context: Context) {
                 homepageSearchBar = o.optBoolean("homepageSearchBar", defaults.homepageSearchBar),
                 homepageFavoriteColor = o.optBoolean("homepageFavoriteColor", defaults.homepageFavoriteColor),
                 toolbarPosition = o.optString("toolbarPosition", defaults.toolbarPosition),
+                userAgent = o.optString("userAgent", defaults.userAgent),
                 toolbarLayout = o.optString("toolbarLayout", defaults.toolbarLayout),
                 toolbarSearch = o.optBoolean("toolbarSearch", defaults.toolbarSearch),
                 customizeMenu = runCatching {
@@ -86,6 +87,7 @@ class SettingsRepository(private val context: Context) {
             .put("homepageSearchBar", s.homepageSearchBar)
             .put("homepageFavoriteColor", s.homepageFavoriteColor)
             .put("toolbarPosition", s.toolbarPosition)
+            .put("userAgent", s.userAgent)
             .put("toolbarLayout", s.toolbarLayout)
             .put("toolbarSearch", s.toolbarSearch)
             .put("customizeMenu", org.json.JSONArray(s.customizeMenu))
