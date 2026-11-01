@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -130,7 +133,7 @@ fun ChromeButton(
 ) {
     Box(
         modifier = modifier
-            .size(48.dp)
+            .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp)
             .alpha(if (enabled) 1f else 0.35f)
             .jumpClickable(RoundedCornerShape(18.dp), enabled, onClick),
         contentAlignment = Alignment.Center,
@@ -533,9 +536,9 @@ fun JumpAlertDialog(
         scale.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 520f))
     }
 
-    val cardHeight = remember {
-        androidx.compose.runtime.mutableFloatStateOf(0f)
-    }
+    val cardHeight = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    // The reference dialog window hugs its content; allow long dialogs to scroll.
+    val maxDialogHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 48.dp
     Dialog(
         onDismissRequest = { close() },
         properties = DialogProperties(
@@ -565,6 +568,7 @@ fun JumpAlertDialog(
                 modifier = modifier
                     .fillMaxWidth(0.8f)
                     .widthIn(max = 288.dp)
+                    .heightIn(max = maxDialogHeight)
                     .onSizeChanged {
                         cardWidth = it.width
                         cardHeight.value = it.height.toFloat()
@@ -608,6 +612,12 @@ fun JumpAlertDialog(
                 shadowElevation = 0.dp,
             ) {
                 Column(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    ) {
                     icon?.let {
                         Box(
                             Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -645,6 +655,7 @@ fun JumpAlertDialog(
                                     .padding(top = if (title == null) 14.dp else 0.dp),
                             ) { it() }
                         }
+                    }
                     }
                     Row(
                         Modifier

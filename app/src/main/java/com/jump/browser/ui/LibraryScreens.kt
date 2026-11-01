@@ -112,6 +112,7 @@ fun ScreenScaffold(
     headerHeight: androidx.compose.ui.unit.Dp = 48.dp,
     titleSize: androidx.compose.ui.unit.TextUnit = 16.sp,
     titleStartPadding: androidx.compose.ui.unit.Dp = 0.dp,
+    titleBold: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -130,7 +131,7 @@ fun ScreenScaffold(
                 text = title,
                 modifier = Modifier.weight(1f),
                 fontSize = titleSize,
-                fontWeight = FontWeight.Bold,
+                fontWeight = if (titleBold) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -780,6 +781,7 @@ fun SettingsScreen(
             headerHeight = 54.dp,
             titleSize = 20.sp,
             titleStartPadding = 2.dp,
+            titleBold = false,
         ) {
         when (cat) {
             null -> {
@@ -797,7 +799,7 @@ fun SettingsScreen(
                 }
             }
             "General" -> {
-                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 13.dp)) {
                     item { SettingsLabelRow("Sync") { toast("Sync is not enabled") } }
                     item { SettingsLabelRow("User-agent", activeUserAgentLabel(settings.desktopMode)) { dialog = "userAgent" } }
                     item { SettingsLabelRow("Clear data") { dialog = "clear" } }
@@ -1255,8 +1257,8 @@ fun SettingsScreen(
 private fun SettingsLabelRow(
     title: String,
     subtitle: String? = null,
-    titleSize: androidx.compose.ui.unit.TextUnit = 14.sp,
-    verticalPadding: androidx.compose.ui.unit.Dp = 21.125.dp,
+    titleSize: androidx.compose.ui.unit.TextUnit = 16.sp,
+    verticalPadding: androidx.compose.ui.unit.Dp = 18.dp,
     onClick: () -> Unit,
 ) {
     Row(
@@ -1330,7 +1332,7 @@ fun JumpOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Box(
             Modifier
-                .size(18.dp)
+                .size(20.dp)
                 .clip(CircleShape)
                 .background(if (selected) JumpAccent else Color.Transparent)
                 .border(
@@ -1339,7 +1341,7 @@ fun JumpOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
                     shape = CircleShape,
                 ),
         )
-        Spacer(Modifier.width(21.dp))
+        Spacer(Modifier.width(20.dp))
         BasicText(
             text = label,
             style = TextStyle(
