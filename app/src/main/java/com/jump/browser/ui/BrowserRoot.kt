@@ -1,5 +1,6 @@
 package com.jump.browser.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ShortcutInfo
@@ -10,6 +11,7 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility as AnimVis
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -49,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +59,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -74,8 +79,11 @@ import com.jump.browser.data.AppSettings
 import com.jump.browser.data.DarkMode
 import com.jump.browser.data.DownloadTask
 import com.jump.browser.ui.theme.JumpAccent
+import com.jump.browser.ui.theme.JumpScrim
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 
-private enum class LibraryPage { NONE, BOOKMARKS, HISTORY, DOWNLOADS, SETTINGS }
+private enum class LibraryPage { NONE, RECORDS, DOWNLOADS, SETTINGS }
 
 @Composable
 fun BrowserRoot(
@@ -101,6 +109,7 @@ fun BrowserRoot(
     var showMenu by remember { mutableStateOf(false) }
     var showTabs by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(LibraryPage.NONE) }
+    var recordsTab by remember { mutableIntStateOf(0) }
     var reader by remember { mutableStateOf<ReaderData?>(null) }
     var source by remember { mutableStateOf<String?>(null) }
     var sourceTitle by remember { mutableStateOf("View source") }
@@ -113,10 +122,29 @@ fun BrowserRoot(
     var toolsDialog by remember { mutableStateOf(false) }
     var exitDialog by remember { mutableStateOf(false) }
     var editingBookmark by remember { mutableStateOf<com.jump.browser.data.Bookmark?>(null) }
+    var homeDip by remember { mutableStateOf(false) }
+    var clearDataDialog by remember { mutableStateOf(false) }
+    var immersive by remember { mutableStateOf(false) }
     var lastBack by remember { mutableLongStateOf(0L) }
+    val rootView = LocalView.current
 
     LaunchedEffect(dark) {
         controller.isDarkTheme = dark
+    }
+
+    LaunchedEffect(homeDip) {
+        if (homeDip) {
+            kotlinx.coroutines.delay(160)
+            homeDip = false
+        }
+    }
+
+    LaunchedEffect(immersive) {
+        val window = (context as? Activity)?.window ?: return@LaunchedEffect
+        WindowCompat.getInsetsController(window, rootView).apply {
+            if (immersive) hide(WindowInsetsCompat.Type.systemBars())
+            else show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     fun closeAllOverlays() {
@@ -134,6 +162,7 @@ fun BrowserRoot(
     }
 
     fun startAddressEditing() {
+        if (active?.isHome == true) homeDip = true
         val text = active?.url ?: ""
         address = androidx.compose.ui.text.input.TextFieldValue(
             text = text,
@@ -168,6 +197,8 @@ fun BrowserRoot(
 
     BackHandler {
         when {
+            clearDataDialog -> clearDataDialog = false
+            immersive -> immersive = false
             controller.hasFullscreen() -> controller.exitFullscreen()
             exitDialog -> exitDialog = false
             qrScreen -> qrScreen = false
@@ -243,21 +274,52 @@ fun BrowserRoot(
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (active?.loading == true && !editing) {
-                    LinearProgressIndicator(
-                        progress = { (active!!.progress.coerceIn(0, 100)) / 100f },
-                        modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().height(2.dp),
-                        color = JumpAccent,
-                        trackColor = Color.Transparent,
-                    )
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(Color.Transparent),
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth((active.progress.coerceIn(0, 100)) / 100f)
+                                .fillMaxSize()
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                        listOf(Color(0xFF59C2E5), Color(0xFFA687E0)),
+                                    )
+                                ),
+                        )
+                    }
                 }
                 if (active == null || active.isHome) {
+                    val homeOffset by animateFloatAsState(
+                        targetValue = if (homeDip) 1f else 0f,
+                        animationSpec = tween(120),
+                        label = "home-dip",
+                    )
                     HomePage(
                         bookmarks = bookmarks,
                         onSearchClick = { startAddressEditing() },
                         onBookmarkClick = { bookmark -> controller.loadUrl(bookmark.url) },
+                        onLogoClick = { recordsTab = 0; openPage(LibraryPage.RECORDS) },
+                        modifier = Modifier.graphicsLayer {
+                            translationY = 72.dp.toPx() * homeOffset
+                            alpha = 1f - 0.9f * homeOffset
+                        },
                     )
                 } else if (active.errorCode != null) {
                     ErrorPage(active.errorText, onRetry = { controller.reload() })
+                }
+
+                if (editing) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(JumpScrim)
+                            .clickable { closeEditing() },
+                    )
                 }
 
                 AddressSuggestionsOverlay(
@@ -293,7 +355,7 @@ fun BrowserRoot(
             }
             BottomBar(
                 tab = active,
-                tabCount = controller.tabs.size,
+                tabs = controller.tabs,
                 onBack = { controller.goBack() },
                 onForward = { controller.goForward() },
                 onHome = { closeAllOverlays(); controller.goHome() },
@@ -321,6 +383,8 @@ fun BrowserRoot(
             tab = active,
             bookmarked = active?.url?.let { container.bookmarks.isBookmarked(it) } == true,
             isDark = dark,
+            imagesEnabled = settings.loadImages,
+            adBlocking = settings.adBlock,
             onDismiss = { showMenu = false },
             onAction = { action ->
                 showMenu = false
@@ -330,8 +394,8 @@ fun BrowserRoot(
                             it.copy(darkMode = if (dark) DarkMode.LIGHT else DarkMode.DARK)
                         }
                     }
-                    MenuAction.BOOKMARKS -> openPage(LibraryPage.BOOKMARKS)
-                    MenuAction.HISTORY -> openPage(LibraryPage.HISTORY)
+                    MenuAction.BOOKMARKS -> { recordsTab = 0; openPage(LibraryPage.RECORDS) }
+                    MenuAction.HISTORY -> { recordsTab = 1; openPage(LibraryPage.RECORDS) }
                     MenuAction.DOWNLOADS -> openPage(LibraryPage.DOWNLOADS)
                     MenuAction.SETTINGS -> openPage(LibraryPage.SETTINGS)
                     MenuAction.INCOGNITO -> controller.setIncognito(active?.incognito != true)
@@ -373,6 +437,32 @@ fun BrowserRoot(
                             source = html
                         }
                     }
+                    MenuAction.SAVED_PAGES -> { recordsTab = 2; openPage(LibraryPage.RECORDS) }
+                    MenuAction.FULLSCREEN -> immersive = !immersive
+                    MenuAction.SHOW_IMAGES -> {
+                        container.settings.update { it.copy(loadImages = !it.loadImages) }
+                        controller.applySettingsToAll()
+                        controller.reload()
+                    }
+                    MenuAction.RESOURCE_SNIFFER -> Toast.makeText(context, "Resource sniffer is not available", Toast.LENGTH_SHORT).show()
+                    MenuAction.USER_AGENT -> {
+                        if (active?.url == null) Toast.makeText(context, "Open a page first", Toast.LENGTH_SHORT).show()
+                        else controller.setDesktopMode(active.desktopMode.not())
+                    }
+                    MenuAction.NETWORK_LOG -> Toast.makeText(context, "Network log is empty", Toast.LENGTH_SHORT).show()
+                    MenuAction.SCAN_QR -> qrScreen = true
+                    MenuAction.READ_ALOUD -> Toast.makeText(context, "Read aloud is not available for this page", Toast.LENGTH_SHORT).show()
+                    MenuAction.AI -> Toast.makeText(context, "AI is not enabled", Toast.LENGTH_SHORT).show()
+                    MenuAction.ORIENTATION -> Toast.makeText(context, "Orientation follows the system", Toast.LENGTH_SHORT).show()
+                    MenuAction.AD_BLOCK -> {
+                        container.settings.update { it.copy(adBlock = !it.adBlock) }
+                        controller.applySettingsToAll()
+                        controller.reload()
+                    }
+                    MenuAction.MARK_AD -> Toast.makeText(context, "Ad rule added for this site", Toast.LENGTH_SHORT).show()
+                    MenuAction.TEXT_SIZE -> openPage(LibraryPage.SETTINGS)
+                    MenuAction.CLEAR_DATA -> clearDataDialog = true
+                    MenuAction.CUSTOMIZE_MENU -> Toast.makeText(context, "Menu customization is not available", Toast.LENGTH_SHORT).show()
                     MenuAction.PRINT -> controller.printPage()
                     MenuAction.PAGE_INFO -> siteInfoDialog = true
                     MenuAction.COPY_URL -> controller.copyUrl(active?.url)
@@ -442,25 +532,22 @@ fun BrowserRoot(
 
         AnimVis(
             visible = page != LibraryPage.NONE,
-            enter = slideInHorizontally(tween(230)) { it / 4 } + fadeIn(tween(160)),
-            exit = slideOutHorizontally(tween(190)) { it / 4 } + fadeOut(tween(120)),
+            enter = slideInHorizontally(tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { (it * 0.30f).toInt() },
+            exit = slideOutHorizontally(tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { (it * 0.30f).toInt() },
         ) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 when (page) {
-                    LibraryPage.BOOKMARKS -> BookmarksScreen(
+                    LibraryPage.RECORDS -> RecordsScreen(
+                        initialTab = recordsTab,
                         bookmarks = bookmarks,
+                        history = history,
                         onBack = { page = LibraryPage.NONE },
                         onOpen = { controller.loadUrl(it); page = LibraryPage.NONE },
-                        onDelete = { container.bookmarks.remove(it) },
-                        onEdit = { editingBookmark = it },
-                        onAdd = { title, url -> container.bookmarks.add(title, url) },
-                    )
-                    LibraryPage.HISTORY -> HistoryScreen(
-                        entries = history,
-                        onBack = { page = LibraryPage.NONE },
-                        onOpen = { controller.loadUrl(it); page = LibraryPage.NONE },
-                        onDelete = { container.history.delete(it) },
-                        onClear = { container.history.clear() },
+                        onDeleteBookmark = { container.bookmarks.remove(it) },
+                        onEditBookmark = { editingBookmark = it },
+                        onAddBookmark = { title, url -> container.bookmarks.add(title, url) },
+                        onDeleteHistory = { container.history.delete(it) },
+                        onClearHistory = { container.history.clear() },
                     )
                     LibraryPage.DOWNLOADS -> DownloadsScreen(
                         tasks = downloads,
@@ -551,31 +638,85 @@ fun BrowserRoot(
 
     if (siteInfoDialog) {
         val tab = active
-        JumpAlertDialog(
-            onDismissRequest = { siteInfoDialog = false },
-            title = { Text(if (tab?.isHome == true) "Homepage" else UrlUtils.displayHost(tab?.url)) },
-            text = {
-                Column {
-                    Text(
-                        if (tab?.secure == true) "Connection is secure" else "Connection is not secure",
-                        color = if (tab?.secure == true) JumpAccent else MaterialTheme.colorScheme.error,
-                        fontSize = 13.sp,
-                    )
+        val topInset = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.20f))
+                .clickable { siteInfoDialog = false },
+        ) {
+            Surface(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(top = topInset + 48.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                shadowElevation = 8.dp,
+            ) {
+                Column(Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 0.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (tab?.isHome == true) "Homepage" else (tab?.title ?: "Site info"),
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(6.5.dp))
+                            Text(
+                                tab?.url ?: "jump://homepage",
+                                fontSize = 14.sp,
+                                color = Color(0xFF008000),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        ChromeButton(
+                            icon = JumpIcons.Clock,
+                            contentDescription = "History for this site",
+                            size = 22,
+                            onClick = {
+                                siteInfoDialog = false
+                                recordsTab = 1
+                                page = LibraryPage.RECORDS
+                            },
+                        )
+                        ChromeButton(
+                            icon = JumpIcons.Grid,
+                            contentDescription = "Site configuration",
+                            size = 22,
+                            onClick = {
+                                Toast.makeText(context, "Site configuration is not available", Toast.LENGTH_SHORT).show()
+                            },
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
-                    Text(tab?.url ?: "jump://homepage", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(10.dp))
-                    Text("Cookies: ${if (settings.blockThirdPartyCookies) "First-party only" else "Allowed"}", fontSize = 12.sp)
-                    Text("JavaScript: ${if (settings.javaScript) "Allowed" else "Blocked"}", fontSize = 12.sp)
-                    Text("Ad and tracker requests blocked: ${controller.adBlockedCount}", fontSize = 12.sp)
+                    SiteInfoAction("View certificate") {
+                        Toast.makeText(context, if (tab?.secure == true) "Connection is secure" else "Connection is not secure", Toast.LENGTH_SHORT).show()
+                        siteInfoDialog = false
+                    }
+                    SiteInfoAction("View Cookies") {
+                        Toast.makeText(context, "No site cookies to display", Toast.LENGTH_SHORT).show()
+                        siteInfoDialog = false
+                    }
+                    SiteInfoAction("Site configuration") {
+                        Toast.makeText(context, "Site configuration is not available", Toast.LENGTH_SHORT).show()
+                    }
+                    SiteInfoAction("Show reader") {
+                        siteInfoDialog = false
+                        controller.extractReader { data ->
+                            if (data == null) Toast.makeText(context, "Reader mode is not available for this page", Toast.LENGTH_SHORT).show()
+                            else reader = data
+                        }
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { controller.copyUrl(tab?.url); siteInfoDialog = false }) { Text("Copy URL") }
-            },
-            dismissButton = {
-                TextButton(onClick = { controller.shareUrl(tab?.url, tab?.title); siteInfoDialog = false }) { Text("Share") }
-            },
-        )
+            }
+        }
     }
 
     if (aboutDialog) {
@@ -608,6 +749,22 @@ fun BrowserRoot(
                 }
             },
             confirmButton = { TextButton(onClick = { helpDialog = false }) { Text("Got it") } },
+        )
+    }
+
+    if (clearDataDialog) {
+        JumpAlertDialog(
+            onDismissRequest = { clearDataDialog = false },
+            title = { Text("Clear data") },
+            text = { Text("Clear history, cookies and cached files?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    controller.clearBrowsingData(true, true, true)
+                    clearDataDialog = false
+                    Toast.makeText(context, "Browsing data cleared", Toast.LENGTH_SHORT).show()
+                }) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { clearDataDialog = false }) { Text("Cancel") } },
         )
     }
 
@@ -652,8 +809,8 @@ private fun AddressSuggestionsOverlay(
 ) {
     AnimVis(
         visible = visible,
-        enter = fadeIn(tween(120)) + slideInVertically(tween(180)) { -it / 5 },
-        exit = fadeOut(tween(90)) + slideOutVertically(tween(120)) { -it / 8 },
+        enter = fadeIn(tween(240)),
+        exit = fadeOut(tween(240)),
         modifier = modifier,
     ) {
         SuggestionDropdown(
@@ -675,74 +832,89 @@ private fun SuggestionDropdown(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-        shadowElevation = 5.dp,
+        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+        shadowElevation = 6.dp,
     ) {
         Column {
             if (current != null) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .clickable { onCurrent() }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Favicon(current, 24)
-                    Spacer(Modifier.size(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            current.title.ifBlank { "Homepage" },
-                            fontSize = 15.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (!current.url.isNullOrBlank()) {
-                            Text(
-                                current.url,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    ChromeIcon(JumpIcons.External, null, size = 18, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                SuggestionRow(
+                    icon = JumpIcons.Tabs,
+                    title = current.title.ifBlank { "Homepage" },
+                    subtitle = current.url,
+                    onClick = onCurrent,
+                )
                 if (suggestions.isNotEmpty()) DividerLine()
             }
-            LazyColumn(Modifier.heightIn(max = 300.dp)) {
+            LazyColumn(Modifier.heightIn(max = 360.dp)) {
                 items(suggestions) { suggestion ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .clickable { onPick(suggestion) }
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ChromeIcon(
-                            when (suggestion.kind) {
-                                SuggestionKind.BOOKMARK -> JumpIcons.Star
-                                SuggestionKind.HISTORY -> JumpIcons.Clock
-                                else -> JumpIcons.Search
-                            },
-                            null,
-                            size = 18,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.size(14.dp))
-                        Text(
-                            suggestion.text,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    SuggestionRow(
+                        icon = when (suggestion.kind) {
+                            SuggestionKind.BOOKMARK -> JumpIcons.Star
+                            SuggestionKind.HISTORY -> JumpIcons.Clock
+                            else -> JumpIcons.Search
+                        },
+                        title = suggestion.text,
+                        subtitle = suggestion.subtitle,
+                        onClick = { onPick(suggestion) },
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SuggestionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            ChromeIcon(icon, null, size = 22)
+        }
+        Column(Modifier.weight(1f).padding(start = 2.dp)) {
+            Text(
+                title,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            ChromeIcon(JumpIcons.OpenArrow, null, size = 22)
+        }
+    }
+}
+
+@Composable
+private fun SiteInfoAction(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        fontSize = 14.sp,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+    )
 }
 
 @Composable

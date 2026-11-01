@@ -117,8 +117,10 @@ their own status-inset handling.
 
 The bottom bar adds the navigation-bar inset outside its 48dp content height.
 The tab popup is inset by the bottom bar height, so the toolbar stays visible
-and undimmed. The menu sheet includes the navigation inset and covers the
-toolbar, exactly like the reference experience.
+and undimmed. The menu sheet is a 238dp rounded card with a 1dp outline, inset
+above the navigation bar; its grid rows are 82dp with 24dp icons and 10.5sp
+labels. Library headers use a 48dp toolbar, 16sp bold title, 44dp search field
+and 16sp action bar labels.
 
 ## Motion
 
@@ -126,17 +128,18 @@ Motion is part of the product, not decoration.
 
 | Transition | Enter | Exit |
 |---|---|---|
-| Address bar swap | 130ms fade + 150ms 1/12 slide | 90ms fade + 120ms slide |
-| Suggestion dropdown | 120ms fade + 180ms slide | 90ms fade + 120ms slide |
-| Menu scrim | 180ms fade | 150ms fade |
-| Menu sheet | 220ms slide-up + 120ms fade | 170ms slide-down + 100ms fade |
-| Tab popup scrim | 170ms fade | 140ms fade |
-| Tab popup panel | 210ms slide-up + 100ms fade | 160ms slide-down + 80ms fade |
-| Library screens | 230ms slide + 160ms fade | 190ms slide + 120ms fade |
+| Address bar and suggestions | 240ms fade | 240ms fade |
+| Menu scrim | 160ms fade, 20% dim | 160ms fade |
+| Menu sheet | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
+| Tab popup scrim | 160ms fade, 25% dim | 160ms fade |
+| Tab popup panel | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
+| Library screens | 220ms horizontal slide (30%) | 220ms horizontal slide |
 | Context menu | 100ms fade | 100ms fade |
 
-Easing is decelerating (`FastOutSlowInEasing`) for movement and linear for
-fades. Page indicator and menu paging use the horizontal pager's own spring.
+Movement uses an accelerating curve for bottom sheets and popups, matching the
+reference window animations. Page indicator and menu paging use the horizontal
+pager's own spring. The homepage search gesture translates content down by
+72dp and fades it to 10% before opening the address overlay.
 
 ## Extension points
 

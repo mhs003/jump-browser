@@ -18,16 +18,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
+// Palette extracted from the reference resources.
 val JumpWhite = Color(0xFFFFFFFF)
-val JumpInk = Color(0xFF1C1B1D)
+val JumpNight = Color(0xFF1C1B1D)
 val JumpAccent = Color(0xFF6F8DE1)
-val JumpAccentDark = Color(0xFF9AAEEF)
-val JumpMuted = Color(0xFF8A8A8E)
-val JumpDivider = Color(0xFFE8E8EA)
-val JumpSurfaceDark = Color(0xFF232326)
-val JumpInkDark = Color(0xFFF3F2F5)
-val JumpMutedDark = Color(0xFF9C9CA3)
-val JumpDividerDark = Color(0xFF34343A)
+val JumpAccentDark = Color(0xFF617AC1)
+val JumpInk = Color(0xDE000000)
+val JumpInkDark = Color(0xBEFFFFFF)
+val JumpIcon = Color(0xFF232323)
+val JumpIconDark = Color(0xFF9F9F9F)
+val JumpMuted = Color(0x8A000000)
+val JumpMutedDark = Color(0x99FFFFFF)
+val JumpOutline = Color(0xFFC2C2C2)
+val JumpOutlineDark = Color(0xFF3A3A3D)
+val JumpAddressLight = Color(0xFFEEEEEE)
+val JumpAddressDark = Color(0xFF242426)
+val JumpPressed = Color(0x30808080)
+val JumpScrim = Color(0x2E000000)
 
 private val Light = lightColorScheme(
     primary = JumpAccent,
@@ -39,41 +46,42 @@ private val Light = lightColorScheme(
     background = JumpWhite,
     onBackground = JumpInk,
     surface = JumpWhite,
-    onSurface = JumpInk,
-    surfaceVariant = Color(0xFFF5F5F7),
+    onSurface = JumpIcon,
+    surfaceVariant = JumpAddressLight,
     onSurfaceVariant = JumpMuted,
-    outline = Color(0xFFD8D8DC),
-    outlineVariant = JumpDivider,
+    outline = JumpOutline,
+    outlineVariant = Color(0xFFE4E4E4),
     error = Color(0xFFD64146),
 )
 
 private val Dark = darkColorScheme(
     primary = JumpAccentDark,
-    onPrimary = Color(0xFF122044),
+    onPrimary = Color.White,
     primaryContainer = Color(0xFF2A3C6E),
     onPrimaryContainer = Color(0xFFDDE4FF),
     secondary = JumpAccentDark,
-    onSecondary = Color(0xFF122044),
-    background = Color(0xFF1C1B1D),
+    onSecondary = Color.White,
+    background = JumpNight,
     onBackground = JumpInkDark,
-    surface = JumpSurfaceDark,
-    onSurface = JumpInkDark,
-    surfaceVariant = Color(0xFF2C2C30),
+    surface = JumpNight,
+    onSurface = JumpIconDark,
+    surfaceVariant = JumpAddressDark,
     onSurfaceVariant = JumpMutedDark,
-    outline = Color(0xFF45454C),
-    outlineVariant = JumpDividerDark,
+    outline = JumpOutlineDark,
+    outlineVariant = Color(0xFF333336),
     error = Color(0xFFFF7A7E),
 )
 
 private val JumpTypography = Typography(
     headlineLarge = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 28.sp),
     headlineMedium = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 24.sp),
+    headlineSmall = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 20.sp),
     titleLarge = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 20.sp),
-    titleMedium = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 16.sp),
-    bodyLarge = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 15.sp),
+    titleMedium = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 16.sp),
+    bodyLarge = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 16.sp),
     bodyMedium = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 14.sp),
     bodySmall = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 12.sp),
-    labelLarge = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 14.sp),
+    labelLarge = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 14.sp),
     labelMedium = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 11.sp),
     labelSmall = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 10.sp),
 )

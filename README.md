@@ -41,16 +41,16 @@ with its own package (`com.jump.browser`), engine wrapper, data layer, and UI.
 | | |
 |---|---|
 | ![Homepage](docs/screenshots/home.png) | ![Address bar](docs/screenshots/address-bar.png) |
-| **Homepage** with bookmark shortcut. | **Blueprint address bar** with live suggestions. |
+| **Homepage** with the reference geometry and logo. | **Address bar** with live suggestions and page scrim. |
 | ![Menu](docs/screenshots/menu.png) | ![Tabs](docs/screenshots/tabs.png) |
 | **Action sheet** with paged tools. | **Compact tab popup** anchored to the toolbar. |
-| ![Settings](docs/screenshots/settings.png) | ![Night mode](docs/screenshots/night-mode.png) |
-| **Settings** with granular controls. | **Night mode** across chrome and page content. |
+| ![Settings](docs/screenshots/settings.png) | ![Settings detail](docs/screenshots/settings-general.png) |
+| **Settings categories.** | **General settings** with value subtitles. |
 | ![Downloads](docs/screenshots/downloads.png) | ![Context menu](docs/screenshots/context-menu.png) |
 | **Download manager.** | **Long-press link and image actions.** |
 
-More captures: [page](docs/screenshots/page.png), [reader mode](docs/screenshots/reader.png),
-[bookmarks](docs/screenshots/bookmarks.png).
+More captures: [page](docs/screenshots/page.png), [bookmarks and history](docs/screenshots/bookmarks.png),
+[night mode](docs/screenshots/night-mode.png), [reader mode](docs/screenshots/reader.png).
 
 ## Architecture
 

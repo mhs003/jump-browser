@@ -3,6 +3,7 @@ package com.jump.browser.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -41,13 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
+import com.jump.browser.ui.theme.JumpPressed
 
 @Composable
 fun ChromeIcon(
     icon: ImageVector,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.onBackground,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
     size: Int = 24,
 ) {
     Icon(
@@ -64,18 +66,21 @@ fun ChromeButton(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    tint: Color = MaterialTheme.colorScheme.onBackground,
-    size: Int = 24,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    size: Int = 22,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     Box(
         modifier = modifier
             .size(48.dp)
-            .alpha(if (enabled) 1f else 0.32f)
+            .alpha(if (enabled) 1f else 0.35f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (pressed && enabled) JumpPressed else Color.Transparent)
             .clickable(
                 interactionSource = interaction,
-                indication = androidx.compose.material3.ripple(),
+                indication = null,
                 enabled = enabled,
             ) { onClick() },
         contentAlignment = Alignment.Center,
@@ -103,21 +108,26 @@ fun PressableScale(
 @Composable
 fun TabCountBadge(
     count: Int,
+    index: Int,
     tint: Color,
     modifier: Modifier = Modifier,
-    size: Int = 24,
 ) {
-    Box(modifier = modifier.size(size.dp), contentAlignment = Alignment.Center) {
+    val multiple = count > 1
+    Box(modifier = modifier.size(48.dp), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = JumpIcons.Tabs,
             contentDescription = null,
-            tint = tint,
-            modifier = Modifier.fillMaxSize(),
+            tint = tint.copy(alpha = if (multiple) 0.15f else 1f),
+            modifier = Modifier.size(24.dp),
         )
         Text(
-            text = if (count > 99) ":)" else count.toString(),
+            text = when {
+                multiple -> "${index + 1}/$count"
+                count > 99 -> ":)"
+                else -> count.toString()
+            },
             color = tint,
-            fontSize = if (count > 99) 8.sp else 11.sp,
+            fontSize = if (multiple && count > 9) 9.sp else 11.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
@@ -189,7 +199,7 @@ fun Favicon(
             )
         } else {
             Icon(
-                imageVector = if (tab.isHome) JumpIcons.Search else JumpIcons.Globe,
+                imageVector = JumpIcons.Globe,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.size((size - 4).dp),
@@ -215,7 +225,7 @@ fun Dot(selected: Boolean, onClick: () -> Unit) {
             .size(if (selected) 7.dp else 6.dp)
             .clip(CircleShape)
             .background(
-                if (selected) JumpAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
             )
             .clickable { onClick() }
     )
@@ -229,28 +239,32 @@ fun MenuCell(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     Column(
         modifier = Modifier
-            .fillMaxHeight()
-            .clickable(enabled = enabled) { onClick() }
-            .padding(vertical = 10.dp),
+            .fillMaxSize()
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (pressed && enabled) JumpPressed else Color.Transparent)
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled) { onClick() }
+            .padding(start = 5.dp, top = 15.dp, end = 5.dp, bottom = 12.5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
-        Spacer(Modifier.height(8.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(4.5.dp))
         Text(
-            text = label,
+            label,
             color = tint,
-            fontSize = 11.sp,
+            fontSize = 10.5.sp,
             lineHeight = 13.sp,
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }
-
 @Composable
 fun ListRow(
     icon: ImageVector?,
@@ -305,14 +319,14 @@ fun JumpAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(20.dp),
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(18.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     tonalElevation: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = confirmButton,
-        modifier = modifier,
+        modifier = modifier.border(1.dp, JumpPressed, shape),
         dismissButton = dismissButton,
         icon = icon,
         title = title,

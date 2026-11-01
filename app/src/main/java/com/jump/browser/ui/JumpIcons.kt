@@ -47,17 +47,17 @@ object JumpIcons {
 
     val Back = vector("back") {
         line(1.8f) {
-            moveTo(15f, 4.5f)
-            lineTo(7.5f, 12f)
-            lineTo(15f, 19.5f)
+            moveTo(14.9f, 4f)
+            lineTo(8.1f, 12f)
+            lineTo(14.9f, 20f)
         }
     }
 
     val Forward = vector("forward") {
         line(1.8f) {
-            moveTo(9f, 4.5f)
-            lineTo(16.5f, 12f)
-            lineTo(9f, 19.5f)
+            moveTo(9.1f, 4f)
+            lineTo(15.9f, 12f)
+            lineTo(9.1f, 20f)
         }
     }
 
@@ -89,12 +89,12 @@ object JumpIcons {
 
     val Menu = vector("menu") {
         line(1.8f) {
-            moveTo(3.8f, 7f)
-            lineTo(20.2f, 7f)
-            moveTo(3.8f, 12f)
-            lineTo(20.2f, 12f)
-            moveTo(3.8f, 17f)
-            lineTo(20.2f, 17f)
+            moveTo(4.5f, 5f)
+            lineTo(19.5f, 5f)
+            moveTo(4.5f, 12f)
+            lineTo(19.5f, 12f)
+            moveTo(4.5f, 19f)
+            lineTo(19.5f, 19f)
         }
     }
 
@@ -122,21 +122,15 @@ object JumpIcons {
     }
 
     val Refresh = vector("refresh") {
-        solid {
-            moveTo(17.65f, 6.35f)
-            curveTo(16.2f, 4.9f, 14.21f, 4f, 12f, 4f)
-            curveTo(7.58f, 4f, 4.01f, 7.58f, 4.01f, 12f)
-            curveTo(4.01f, 16.42f, 7.58f, 20f, 12f, 20f)
-            curveTo(15.73f, 20f, 18.84f, 17.45f, 19.73f, 14f)
-            lineTo(17.65f, 14f)
-            curveTo(16.83f, 16.33f, 14.61f, 18f, 12f, 18f)
-            curveTo(8.69f, 18f, 6f, 15.31f, 6f, 12f)
-            curveTo(6f, 8.69f, 8.69f, 6f, 12f, 6f)
-            curveTo(13.66f, 6f, 15.14f, 6.69f, 16.22f, 7.78f)
-            lineTo(13f, 11f)
-            lineTo(20f, 11f)
-            lineTo(20f, 4f)
-            close()
+        line(1.75f) {
+            moveTo(19.4f, 10.3f)
+            curveTo(18.8f, 6.6f, 15.7f, 3.9f, 12f, 3.9f)
+            curveTo(7.5f, 3.9f, 3.9f, 7.5f, 3.9f, 12f)
+            curveTo(3.9f, 16.5f, 7.5f, 20.1f, 12f, 20.1f)
+            curveTo(15.7f, 20.1f, 18.8f, 17.4f, 19.4f, 13.7f)
+            moveTo(19.4f, 3.9f)
+            lineTo(19.4f, 10.4f)
+            lineTo(12.9f, 10.4f)
         }
     }
 
@@ -497,6 +491,16 @@ object JumpIcons {
         }
     }
 
+    val OpenArrow = vector("open_arrow") {
+        line(1.7f) {
+            moveTo(5f, 19f)
+            lineTo(19f, 5f)
+            moveTo(9f, 5f)
+            lineTo(19f, 5f)
+            lineTo(19f, 15f)
+        }
+    }
+
     val Copy = vector("copy") {
         line(1.55f) {
             moveTo(8.2f, 8.2f)
@@ -614,6 +618,203 @@ object JumpIcons {
         }
     }
 
+    val Offline = vector("offline") {
+        line(1.55f) {
+            moveTo(4.2f, 7f)
+            lineTo(4.2f, 20f)
+            lineTo(19.8f, 20f)
+            lineTo(19.8f, 7f)
+            moveTo(3f, 7f)
+            lineTo(7f, 4f)
+            lineTo(17f, 4f)
+            lineTo(21f, 7f)
+            moveTo(8f, 4f)
+            lineTo(8f, 9f)
+            lineTo(16f, 9f)
+            lineTo(16f, 4f)
+        }
+    }
+
+    val Code = vector("code") {
+        line(1.7f) {
+            moveTo(8.5f, 7.5f)
+            lineTo(4f, 12f)
+            lineTo(8.5f, 16.5f)
+            moveTo(15.5f, 7.5f)
+            lineTo(20f, 12f)
+            lineTo(15.5f, 16.5f)
+        }
+    }
+
+    val Speaker = vector("speaker") {
+        line(1.6f) {
+            moveTo(4f, 9.2f)
+            lineTo(8f, 9.2f)
+            lineTo(13f, 4.8f)
+            lineTo(13f, 19.2f)
+            lineTo(8f, 14.8f)
+            lineTo(4f, 14.8f)
+            close()
+            moveTo(16.2f, 8.5f)
+            curveTo(17.6f, 10.5f, 17.6f, 13.5f, 16.2f, 15.5f)
+            moveTo(18.8f, 6.2f)
+            curveTo(21.1f, 9.6f, 21.1f, 14.4f, 18.8f, 17.8f)
+        }
+    }
+
+    val Sparkle = vector("sparkle") {
+        line(1.55f) {
+            moveTo(12f, 3.2f)
+            lineTo(14.1f, 9.9f)
+            lineTo(20.8f, 12f)
+            lineTo(14.1f, 14.1f)
+            lineTo(12f, 20.8f)
+            lineTo(9.9f, 14.1f)
+            lineTo(3.2f, 12f)
+            lineTo(9.9f, 9.9f)
+            close()
+            moveTo(18.4f, 3.2f)
+            lineTo(19f, 5f)
+            lineTo(20.8f, 5.6f)
+            lineTo(19f, 6.2f)
+            lineTo(18.4f, 8f)
+            lineTo(17.8f, 6.2f)
+            lineTo(16f, 5.6f)
+            lineTo(17.8f, 5f)
+            close()
+        }
+    }
+
+    val Rotate = vector("rotate") {
+        line(1.55f) {
+            moveTo(7f, 3.8f)
+            lineTo(17f, 3.8f)
+            lineTo(17f, 20.2f)
+            lineTo(7f, 20.2f)
+            close()
+            moveTo(16.8f, 7.2f)
+            curveTo(20.4f, 8.2f, 22f, 11.7f, 20.8f, 15.2f)
+            moveTo(20.9f, 17.7f)
+            lineTo(20.8f, 15.1f)
+            lineTo(18.3f, 15.9f)
+        }
+    }
+
+    val Block = vector("block") {
+        line(1.6f) {
+            moveTo(12f, 3.2f)
+            lineTo(20.4f, 7.5f)
+            lineTo(20.4f, 14f)
+            curveTo(20.4f, 18f, 16.5f, 20.7f, 12f, 22f)
+            curveTo(7.5f, 20.7f, 3.6f, 18f, 3.6f, 14f)
+            lineTo(3.6f, 7.5f)
+            close()
+            moveTo(7f, 12.8f)
+            lineTo(17f, 12.8f)
+        }
+    }
+
+    val Flag = vector("flag") {
+        line(1.6f) {
+            moveTo(6f, 21f)
+            lineTo(6f, 3.4f)
+            moveTo(6f, 4.4f)
+            curveTo(10f, 2.4f, 13.2f, 6.4f, 18f, 4.4f)
+            lineTo(18f, 12.4f)
+            curveTo(13.2f, 14.4f, 10f, 10.4f, 6f, 12.4f)
+        }
+    }
+
+    val TextSize = vector("text_size") {
+        line(1.65f) {
+            moveTo(3.2f, 18f)
+            lineTo(8.2f, 5f)
+            lineTo(13.2f, 18f)
+            moveTo(5f, 14f)
+            lineTo(11.4f, 14f)
+            moveTo(14.6f, 18f)
+            lineTo(17.4f, 10f)
+            lineTo(20.2f, 18f)
+            moveTo(15.5f, 15.6f)
+            lineTo(19.3f, 15.6f)
+        }
+    }
+
+    val Grid = vector("grid") {
+        line(1.55f) {
+            moveTo(4f, 4f)
+            lineTo(9.2f, 4f)
+            lineTo(9.2f, 9.2f)
+            lineTo(4f, 9.2f)
+            close()
+            moveTo(14.8f, 4f)
+            lineTo(20f, 4f)
+            lineTo(20f, 9.2f)
+            lineTo(14.8f, 9.2f)
+            close()
+            moveTo(4f, 14.8f)
+            lineTo(9.2f, 14.8f)
+            lineTo(9.2f, 20f)
+            lineTo(4f, 20f)
+            close()
+            moveTo(14.8f, 14.8f)
+            lineTo(20f, 14.8f)
+            lineTo(20f, 20f)
+            lineTo(14.8f, 20f)
+            close()
+        }
+    }
+
+    val RefreshSmall = Refresh
+    val Chat = vector("chat") {
+        line(1.55f) {
+            moveTo(4.2f, 5f)
+            lineTo(19.8f, 5f)
+            lineTo(19.8f, 16.4f)
+            lineTo(9f, 16.4f)
+            lineTo(4.2f, 20f)
+            close()
+        }
+    }
+
+    val Secure = vector("secure") {
+        line(1.55f) {
+            moveTo(12f, 3.4f)
+            lineTo(19.6f, 6.1f)
+            lineTo(19.6f, 11.3f)
+            curveTo(19.6f, 15.6f, 16.8f, 18.9f, 12f, 20.7f)
+            curveTo(7.2f, 18.9f, 4.4f, 15.6f, 4.4f, 11.3f)
+            lineTo(4.4f, 6.1f)
+            close()
+            moveTo(8.2f, 11.7f)
+            lineTo(10.8f, 14.3f)
+            lineTo(15.8f, 9.2f)
+        }
+    }
+
+    val Scanner = vector("scanner") {
+        line(2f) {
+            moveTo(9f, 3.5f)
+            lineTo(6.3f, 3.5f)
+            curveTo(4.7f, 3.5f, 3.5f, 4.7f, 3.5f, 6.3f)
+            lineTo(3.5f, 9f)
+            moveTo(9f, 20.5f)
+            lineTo(6.3f, 20.5f)
+            curveTo(4.7f, 20.5f, 3.5f, 19.3f, 3.5f, 17.7f)
+            lineTo(3.5f, 15f)
+            moveTo(15f, 3.5f)
+            lineTo(17.7f, 3.5f)
+            curveTo(19.3f, 3.5f, 20.5f, 4.7f, 20.5f, 6.3f)
+            lineTo(20.5f, 9f)
+            moveTo(15f, 20.5f)
+            lineTo(17.7f, 20.5f)
+            curveTo(19.3f, 20.5f, 20.5f, 19.3f, 20.5f, 17.7f)
+            lineTo(20.5f, 15f)
+            moveTo(8f, 12f)
+            lineTo(16f, 12f)
+        }
+    }
+
     val QR = vector("qr") {
         line(1.75f) {
             moveTo(4f, 9f)
@@ -671,16 +872,12 @@ object JumpIcons {
 
     val Expand = vector("expand") {
         line(1.7f) {
-            moveTo(9.5f, 4.2f)
-            lineTo(4.2f, 4.2f)
-            lineTo(4.2f, 9.5f)
-            moveTo(4.6f, 4.6f)
-            lineTo(10.2f, 10.2f)
-            moveTo(14.5f, 19.8f)
-            lineTo(19.8f, 19.8f)
-            lineTo(19.8f, 14.5f)
-            moveTo(19.4f, 19.4f)
-            lineTo(13.8f, 13.8f)
+            moveTo(14f, 4f)
+            lineTo(20f, 4f)
+            lineTo(20f, 10f)
+            moveTo(10f, 20f)
+            lineTo(4f, 20f)
+            lineTo(4f, 14f)
         }
     }
 

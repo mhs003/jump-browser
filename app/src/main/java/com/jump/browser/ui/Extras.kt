@@ -134,23 +134,24 @@ fun FindBar(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(48.dp)
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp),
+            .padding(start = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChromeIcon(JumpIcons.Search, null, size = 19)
-        Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
-                Text("Find in page", fontSize = 14.sp, color = JumpMuted)
+                Text("Find in page", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             BasicTextField(
                 value = query,
                 onValueChange = onQuery,
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium,
-                cursorBrush = SolidColor(JumpAccent),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onNext() }),
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
@@ -158,13 +159,14 @@ fun FindBar(
         }
         Text(
             if (matches.second == 0) "0/0" else "${matches.first}/${matches.second}",
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp),
         )
-        ChromeButton(JumpIcons.ChevronUp, "Previous match", size = 19, onClick = onPrev)
-        ChromeButton(JumpIcons.ChevronDown, "Next match", size = 19, onClick = onNext)
-        ChromeButton(JumpIcons.Close, "Close find", size = 19, onClick = onClose)
+        ChromeButton(JumpIcons.ChevronUp, "Previous match", size = 22, onClick = onPrev)
+        ChromeButton(JumpIcons.ChevronDown, "Next match", size = 22, onClick = onNext)
+        ChromeButton(JumpIcons.Close, "Close find", size = 22, onClick = onClose)
+        Spacer(Modifier.width(4.dp))
     }
 }
 

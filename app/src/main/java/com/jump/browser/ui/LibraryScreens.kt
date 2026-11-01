@@ -2,8 +2,12 @@ package com.jump.browser.ui
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +26,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -36,6 +42,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +53,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +73,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import android.widget.Toast
 import java.util.Locale
 
 @Composable
@@ -88,7 +97,8 @@ fun ScreenScaffold(
             Text(
                 text = title,
                 modifier = Modifier.weight(1f),
-                fontSize = 19.sp,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -97,137 +107,6 @@ fun ScreenScaffold(
         }
         DividerLine()
         Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-    }
-}
-
-@Composable
-fun BookmarksScreen(
-    bookmarks: List<Bookmark>,
-    onBack: () -> Unit,
-    onOpen: (String) -> Unit,
-    onDelete: (Long) -> Unit,
-    onEdit: (Bookmark) -> Unit,
-    onAdd: (String, String) -> Unit,
-) {
-    var searching by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    var showAdd by remember { mutableStateOf(false) }
-    val filtered = remember(bookmarks, query) {
-        if (query.isBlank()) bookmarks else bookmarks.filter {
-            it.title.contains(query, true) || it.url.contains(query, true)
-        }
-    }
-    ScreenScaffold(
-        title = "Bookmarks",
-        onBack = onBack,
-        actions = {
-            ChromeButton(JumpIcons.Search, "Search bookmarks") { searching = !searching }
-            ChromeButton(JumpIcons.Plus, "Add bookmark") { showAdd = true }
-        },
-    ) {
-        Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-            if (searching) {
-                SearchField(
-                    query = query,
-                    onQuery = { query = it },
-                    placeholder = "Search bookmarks",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            if (filtered.isEmpty()) {
-                EmptyState(
-                    JumpIcons.Star,
-                    if (bookmarks.isEmpty()) "No bookmarks yet" else "No matches",
-                    "Bookmarks you save will show up here.",
-                )
-            } else {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(filtered, key = { it.id }) { bookmark ->
-                        BookmarkRow(bookmark, onOpen, onDelete, onEdit)
-                    }
-                    item { Spacer(Modifier.height(16.dp)) }
-                }
-            }
-        }
-    }
-    if (showAdd) {
-        BookmarkEditDialog(
-            initial = null,
-            onDismiss = { showAdd = false },
-            onSave = { title, url ->
-                onAdd(title, url)
-                showAdd = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun BookmarkRow(
-    bookmark: Bookmark,
-    onOpen: (String) -> Unit,
-    onDelete: (Long) -> Unit,
-    onEdit: (Bookmark) -> Unit,
-) {
-    var menu by remember { mutableStateOf(false) }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { onOpen(bookmark.url) }
-            .padding(start = 20.dp, end = 8.dp, top = 11.dp, bottom = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val icon = remember(bookmark.iconPath) {
-            if (bookmark.iconPath.isBlank()) null
-            else runCatching { BitmapFactory.decodeFile(bookmark.iconPath)?.asImageBitmap() }.getOrNull()
-        }
-        Box(
-            Modifier
-                .size(38.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(19.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (icon != null) {
-                Image(
-                    bitmap = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Text(
-                    bookmark.title.take(1).uppercase().ifBlank { "•" },
-                    color = JumpAccent,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(bookmark.title, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                bookmark.url,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Box {
-            ChromeButton(JumpIcons.More, "Bookmark options") { menu = true }
-            androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text("Edit") },
-                    onClick = { menu = false; onEdit(bookmark) },
-                )
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text("Delete") },
-                    onClick = { menu = false; onDelete(bookmark.id) },
-                )
-            }
-        }
     }
 }
 
@@ -267,66 +146,211 @@ fun BookmarkEditDialog(
 }
 
 @Composable
-fun HistoryScreen(
-    entries: List<HistoryEntry>,
+fun RecordsScreen(
+    initialTab: Int,
+    bookmarks: List<Bookmark>,
+    history: List<HistoryEntry>,
     onBack: () -> Unit,
     onOpen: (String) -> Unit,
-    onDelete: (Long) -> Unit,
-    onClear: () -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
+    onEditBookmark: (Bookmark) -> Unit,
+    onAddBookmark: (String, String) -> Unit,
+    onDeleteHistory: (Long) -> Unit,
+    onClearHistory: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
     var query by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var showAdd by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
-    val filtered = remember(entries, query) {
-        if (query.isBlank()) entries else entries.filter {
+    val labels = listOf("Bookmarks", "History", "Saved pages")
+    val filteredBookmarks = remember(bookmarks, query) {
+        if (query.isBlank()) bookmarks else bookmarks.filter {
             it.title.contains(query, true) || it.url.contains(query, true)
         }
     }
-    val grouped = remember(filtered) {
-        filtered.groupBy { Instant.ofEpochMilli(it.visitedAt).atZone(ZoneId.systemDefault()).toLocalDate() }
+    val filteredHistory = remember(history, query) {
+        if (query.isBlank()) history else history.filter {
+            it.title.contains(query, true) || it.url.contains(query, true)
+        }
+    }
+    val groupedHistory = remember(filteredHistory) {
+        filteredHistory.groupBy { Instant.ofEpochMilli(it.visitedAt).atZone(ZoneId.systemDefault()).toLocalDate() }
             .toSortedMap(compareByDescending { it })
     }
-    ScreenScaffold(
-        title = "History",
-        onBack = onBack,
-        actions = {
-            ChromeButton(JumpIcons.Trash, "Clear history", enabled = entries.isNotEmpty()) {
-                confirmClear = true
-            }
-        },
+    val hasRows = when (tab) {
+        0 -> filteredBookmarks.isNotEmpty()
+        1 -> filteredHistory.isNotEmpty()
+        else -> false
+    }
+
+    fun resetMode() {
+        editing = false
+        selected = emptySet()
+    }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
     ) {
-        Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-            SearchField(
-                query = query,
-                onQuery = { query = it },
-                placeholder = "Search history",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            if (filtered.isEmpty()) {
-                EmptyState(
-                    JumpIcons.Clock,
-                    if (entries.isEmpty()) "No history yet" else "No matches",
-                    "Pages you visit will be listed here.",
-                )
-            } else {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    grouped.forEach { (day, dayEntries) ->
-                        item(key = "h-$day") {
-                            Text(
-                                text = dayLabel(day),
-                                modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
-                        items(dayEntries, key = { it.id }) { entry ->
-                            HistoryRow(entry, onOpen, onDelete)
-                        }
-                    }
-                    item { Spacer(Modifier.height(16.dp)) }
+        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+            ChromeButton(JumpIcons.Back, "Back", onClick = onBack)
+            Row(
+                Modifier.weight(1f).padding(start = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(25.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                labels.forEachIndexed { index, label ->
+                    Text(
+                        label,
+                        fontSize = 16.sp,
+                        fontWeight = if (tab == index) FontWeight.Bold else FontWeight.Normal,
+                        color = if (tab == index) MaterialTheme.colorScheme.onBackground
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.clickable {
+                            tab = index
+                            query = ""
+                            resetMode()
+                        }.padding(vertical = 4.dp),
+                    )
                 }
             }
         }
+        DividerLine()
+        LibrarySearchField(query, { query = it }, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (!hasRows) {
+                EmptyMeme()
+            } else {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    when (tab) {
+                        0 -> items(filteredBookmarks, key = { "b${it.id}" }) { bookmark ->
+                            RecordRow(
+                                title = bookmark.title.ifBlank { bookmark.url },
+                                subtitle = bookmark.url,
+                                icon = { BookmarkRecordIcon(bookmark) },
+                                editing = editing,
+                                selected = bookmark.id in selected,
+                                onClick = {
+                                    if (editing) selected = selected.toggle(bookmark.id)
+                                    else onOpen(bookmark.url)
+                                },
+                                onLongClick = { onEditBookmark(bookmark) },
+                            )
+                        }
+                        1 -> groupedHistory.forEach { (day, entries) ->
+                            item(key = "day-$day") {
+                                Text(
+                                    text = day.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+                                )
+                            }
+                            items(entries, key = { "h${it.id}" }) { entry ->
+                                RecordRow(
+                                    title = entry.title.ifBlank { entry.url },
+                                    subtitle = entry.url,
+                                    icon = { ChromeIcon(JumpIcons.Clock, null, size = 22) },
+                                    editing = editing,
+                                    selected = entry.id in selected,
+                                    onClick = {
+                                        if (editing) selected = selected.toggle(entry.id)
+                                        else onOpen(entry.url)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(12.dp)) }
+                }
+            }
+        }
+        DividerLine()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(48.dp)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (editing) {
+                Text(
+                    "Select all",
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable {
+                        selected = when (tab) {
+                            0 -> filteredBookmarks.map { it.id }.toSet()
+                            1 -> filteredHistory.map { it.id }.toSet()
+                            else -> emptySet()
+                        }
+                    }.padding(vertical = 8.dp),
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Delete",
+                    fontSize = 16.sp,
+                    color = if (selected.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.clickable(enabled = selected.isNotEmpty()) {
+                        if (tab == 0) selected.forEach(onDeleteBookmark) else selected.forEach(onDeleteHistory)
+                        resetMode()
+                    }.padding(vertical = 8.dp),
+                )
+                Spacer(Modifier.width(28.dp))
+                Text(
+                    "Done",
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable { resetMode() }.padding(vertical = 8.dp),
+                )
+            } else {
+                Text(
+                    if (tab == 1) "Tabs" else "More",
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable {
+                        when {
+                            tab == 1 -> Toast.makeText(context, "Use the toolbar to switch tabs", Toast.LENGTH_SHORT).show()
+                            tab == 0 -> showAdd = true
+                            else -> Toast.makeText(context, "No saved pages", Toast.LENGTH_SHORT).show()
+                        }
+                    }.padding(vertical = 8.dp),
+                )
+                Spacer(Modifier.weight(1f))
+                if (tab == 1) {
+                    Text(
+                        "Delete all",
+                        fontSize = 16.sp,
+                        color = if (history.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.clickable(enabled = history.isNotEmpty()) { confirmClear = true }
+                            .padding(vertical = 8.dp),
+                    )
+                    Spacer(Modifier.width(28.dp))
+                }
+                Text(
+                    "Edit",
+                    fontSize = 16.sp,
+                    color = if (hasRows) MaterialTheme.colorScheme.onBackground
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable(enabled = hasRows) { editing = true; selected = emptySet() }
+                        .padding(vertical = 8.dp),
+                )
+            }
+        }
+    }
+
+    if (showAdd) {
+        BookmarkEditDialog(
+            initial = null,
+            onDismiss = { showAdd = false },
+            onSave = { title, url -> onAddBookmark(title, url); showAdd = false },
+        )
     }
     if (confirmClear) {
         JumpAlertDialog(
@@ -334,41 +358,117 @@ fun HistoryScreen(
             title = { Text("Clear history?") },
             text = { Text("All browsing history will be permanently deleted.") },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClear() }) { Text("Clear") }
+                TextButton(onClick = { confirmClear = false; onClearHistory() }) { Text("Clear") }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
     }
 }
 
+private fun Set<Long>.toggle(id: Long): Set<Long> = if (id in this) this - id else this + id
+
 @Composable
-private fun HistoryRow(entry: HistoryEntry, onOpen: (String) -> Unit, onDelete: (Long) -> Unit) {
+private fun LibrarySearchField(
+    query: String,
+    onQuery: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFFF2F2F2))
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (query.isEmpty()) {
+            Text("Search", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        BasicTextField(
+            value = query,
+            onValueChange = onQuery,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun EmptyMeme() {
+    Box(Modifier.fillMaxSize().padding(bottom = 20.dp), contentAlignment = Alignment.Center) {
+        Text("¯\\_(ツ)_/¯", fontSize = 22.sp, color = Color(0xFF808080))
+    }
+}
+
+@Composable
+private fun BookmarkRecordIcon(bookmark: Bookmark) {
+    val icon = remember(bookmark.iconPath) {
+        if (bookmark.iconPath.isBlank()) null
+        else runCatching { BitmapFactory.decodeFile(bookmark.iconPath)?.asImageBitmap() }.getOrNull()
+    }
+    Box(Modifier.size(30.dp).background(Color(0xFFE8EDFC), CircleShape), contentAlignment = Alignment.Center) {
+        if (icon != null) {
+            Image(
+                bitmap = icon,
+                contentDescription = null,
+                modifier = Modifier.size(30.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(
+                bookmark.title.trim().take(1).uppercase().ifBlank { "•" },
+                color = JumpAccent,
+                fontSize = 14.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecordRow(
+    title: String,
+    subtitle: String,
+    icon: @Composable () -> Unit,
+    editing: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onOpen(entry.url) }
-            .padding(start = 20.dp, end = 4.dp, top = 9.dp, bottom = 9.dp),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(entry.title, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { icon() }
+        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(
-                entry.url,
-                fontSize = 12.sp,
+                subtitle,
+                fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            timeLabel(entry.visitedAt),
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
-        Box(Modifier.size(40.dp).clickable { onDelete(entry.id) }, contentAlignment = Alignment.Center) {
-            ChromeIcon(JumpIcons.Close, "Delete history entry", size = 17)
+        if (editing) {
+            Box(
+                Modifier
+                    .size(20.dp)
+                    .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color(0xFFD0D0D0), CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) ChromeIcon(JumpIcons.Check, null, size = 14, tint = Color.White)
+            }
         }
     }
 }
@@ -381,80 +481,197 @@ fun DownloadsScreen(
     onDelete: (Long) -> Unit,
     onClearCompleted: () -> Unit,
 ) {
-    ScreenScaffold(
-        title = "Downloads",
-        onBack = onBack,
-        actions = {
-            ChromeButton(JumpIcons.Trash, "Clear completed", enabled = tasks.isNotEmpty()) {
-                onClearCompleted()
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableIntStateOf(0) }
+    var editing by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    val context = LocalContext.current
+    val filters = listOf("All", "Documents", "Archives", "APK", "Images", "Videos")
+    val filtered = remember(tasks, query, filter) {
+        tasks.filter { task ->
+            val matchesText = query.isBlank() || task.title.contains(query, true) || task.url.contains(query, true)
+            matchesText && when (filter) {
+                1 -> task.isDocument()
+                2 -> task.isArchive()
+                3 -> task.isApk()
+                4 -> task.isImage()
+                5 -> task.isVideo()
+                else -> true
             }
-        },
+        }
+    }
+    val grouped = remember(filtered) {
+        filtered.groupBy { Instant.ofEpochMilli(it.createdAt).atZone(ZoneId.systemDefault()).toLocalDate() }
+            .toSortedMap(compareByDescending { it })
+    }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
     ) {
-        if (tasks.isEmpty()) {
-            EmptyState(
-                JumpIcons.Download,
-                "No downloads",
-                "Files you download in Jump will appear here.",
-                Modifier.navigationBarsPadding(),
-            )
-        } else {
-            LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
-                items(tasks, key = { it.id }) { task ->
-                    DownloadRow(task, onOpen, onDelete)
-                    DividerLine(Modifier.padding(start = 68.dp))
+        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+            ChromeButton(JumpIcons.Back, "Back", onClick = onBack)
+            Text("Downloads", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        }
+        DividerLine()
+        LibrarySearchField(query, { query = it }, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            filters.forEachIndexed { index, label ->
+                val active = filter == index
+                Box(
+                    Modifier
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, if (active) MaterialTheme.colorScheme.primary else Color(0xFFD3D3D3), RoundedCornerShape(12.dp))
+                        .clickable { filter = index }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        fontSize = 14.sp,
+                        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                    )
                 }
+            }
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (grouped.isEmpty()) {
+                EmptyMeme()
+            } else {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    grouped.forEach { (day, dayTasks) ->
+                        item(key = "d-$day") {
+                            Text(
+                                day.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+                            )
+                        }
+                        items(dayTasks, key = { it.id }) { task ->
+                            DownloadRecordRow(
+                                task,
+                                editing,
+                                task.id in selected,
+                                onClick = {
+                                    if (editing) selected = selected.toggle(task.id)
+                                    else if (task.state == DownloadState.COMPLETE) onOpen(task)
+                                },
+                            )
+                        }
+                    }
+                    item { Spacer(Modifier.height(12.dp)) }
+                }
+            }
+        }
+        DividerLine()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(48.dp)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (editing) {
+                Text("Select all", fontSize = 16.sp, modifier = Modifier.clickable {
+                    selected = filtered.map { it.id }.toSet()
+                }.padding(vertical = 8.dp))
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Delete",
+                    fontSize = 16.sp,
+                    color = if (selected.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.clickable(enabled = selected.isNotEmpty()) {
+                        selected.forEach(onDelete)
+                        selected = emptySet()
+                        editing = false
+                    }.padding(vertical = 8.dp),
+                )
+                Spacer(Modifier.width(28.dp))
+                Text("Done", fontSize = 16.sp, modifier = Modifier.clickable { editing = false; selected = emptySet() }.padding(vertical = 8.dp))
+            } else {
+                Text("New", fontSize = 16.sp, modifier = Modifier.clickable {
+                    Toast.makeText(context, "Start a download from a web page", Toast.LENGTH_SHORT).show()
+                }.padding(vertical = 8.dp))
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Edit",
+                    fontSize = 16.sp,
+                    color = if (tasks.isNotEmpty()) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable(enabled = tasks.isNotEmpty()) { editing = true }.padding(vertical = 8.dp),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun DownloadRow(task: DownloadTask, onOpen: (DownloadTask) -> Unit, onDelete: (Long) -> Unit) {
+private fun DownloadRecordRow(
+    task: DownloadTask,
+    editing: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(enabled = task.state == DownloadState.COMPLETE) { onOpen(task) }
-            .padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(38.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(JumpIcons.Download, contentDescription = null, modifier = Modifier.size(19.dp))
+        Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+            Icon(JumpIcons.Download, contentDescription = null, modifier = Modifier.size(22.dp))
         }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(task.title, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
+        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(task.title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
             Text(
                 when (task.state) {
-                    DownloadState.COMPLETE -> "Completed · ${task.sizeText}"
+                    DownloadState.COMPLETE -> task.sizeText
                     DownloadState.FAILED -> "Failed"
-                    DownloadState.PAUSED -> "Paused · ${task.sizeText}"
-                    DownloadState.PENDING -> "Queued"
                     DownloadState.RUNNING -> task.sizeText.ifBlank { "Downloading…" }
+                    DownloadState.PENDING -> "Queued"
+                    DownloadState.PAUSED -> "Paused"
                 },
-                fontSize = 11.sp,
+                fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (task.state == DownloadState.RUNNING || task.state == DownloadState.PENDING) {
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { task.fraction },
                     modifier = Modifier.fillMaxWidth().height(2.dp),
-                    color = JumpAccent,
+                    color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
         }
-        Box(Modifier.size(40.dp).clickable { onDelete(task.id) }, contentAlignment = Alignment.Center) {
-            ChromeIcon(JumpIcons.Close, "Remove download", size = 18)
+        if (editing) {
+            Box(
+                Modifier
+                    .size(20.dp)
+                    .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color(0xFFD0D0D0), CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) ChromeIcon(JumpIcons.Check, null, size = 14, tint = Color.White)
+            }
         }
     }
 }
+
+private fun DownloadTask.isApk(): Boolean = title.endsWith(".apk", true) || mime.contains("android.package")
+private fun DownloadTask.isImage(): Boolean = mime.startsWith("image/") || title.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "gif", "webp", "svg", "bmp")
+private fun DownloadTask.isVideo(): Boolean = mime.startsWith("video/") || title.substringAfterLast('.', "").lowercase() in setOf("mp4", "mkv", "webm", "avi", "mov", "flv")
+private fun DownloadTask.isArchive(): Boolean = title.substringAfterLast('.', "").lowercase() in setOf("zip", "rar", "7z", "tar", "gz", "bz2", "xz")
+private fun DownloadTask.isDocument(): Boolean = mime.startsWith("text/") || mime.contains("pdf") || mime.contains("word") || mime.contains("document") || mime.contains("sheet") || mime.contains("presentation") || title.substringAfterLast('.', "").lowercase() in setOf("pdf", "doc", "docx", "txt", "xls", "xlsx", "ppt", "pptx", "csv")
 
 @Composable
 fun SettingsScreen(
@@ -464,101 +681,153 @@ fun SettingsScreen(
     onClearData: () -> Unit,
     onAbout: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var category by remember { mutableStateOf<String?>(null) }
     var dialog by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = category != null) { category = null }
     var homepageDraft by remember { mutableStateOf(settings.homepageUrl) }
     var customSearchDraft by remember { mutableStateOf(settings.customSearchUrl) }
-    ScreenScaffold(title = "Settings", onBack = onBack) {
-        LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
-            item { SectionHeader("General") }
-            item {
-                SettingsRow(
-                    "Search engine",
-                    settings.searchEngine.name,
-                ) { dialog = "engine" }
-            }
-            if (settings.searchEngineId == "custom") {
-                item {
-                    SettingsRow(
-                        "Custom search URL",
-                        settings.customSearchUrl.ifBlank { "Not set" },
-                    ) { customSearchDraft = settings.customSearchUrl; dialog = "customSearch" }
+
+    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+
+    ScreenScaffold(
+        title = category ?: "Settings",
+        onBack = { if (category != null) category = null else onBack() },
+    ) {
+        when (category) {
+            null -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    listOf("General", "Customization", "Privacy", "Advanced", "Scripts", "About").forEach { title ->
+                        item { SettingsLabelRow(title) { category = title } }
+                    }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
-            item {
-                SettingsRow(
-                    "Homepage",
-                    settings.homepageUrl.ifBlank { "Jump Homepage" },
-                ) { homepageDraft = settings.homepageUrl; dialog = "homepage" }
+            "General" -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    item { SettingsLabelRow("Sync") { toast("Sync is not enabled") } }
+                    item { SettingsLabelRow("User-agent", "Default") { toast("Uses the mobile user agent") } }
+                    item { SettingsLabelRow("Clear data") { dialog = "clear" } }
+                    item { SettingsLabelRow("Ad blocking", if (settings.adBlock) null else "Off") {
+                        onSettingsChange { it.copy(adBlock = !it.adBlock) }
+                    } }
+                    item { SettingsLabelRow("Site configuration") { toast("Configure sites from the page menu") } }
+                    item { SettingsLabelRow("Password manager") { toast("No saved passwords") } }
+                    item { SettingsLabelRow("Night mode", when (settings.darkMode) {
+                        DarkMode.SYSTEM -> "Follow system"
+                        DarkMode.LIGHT -> null
+                        DarkMode.DARK -> "Dark"
+                    }) { dialog = "theme" } }
+                    item { SettingsLabelRow("Reader mode", if (settings.readerMode) "On" else null) {
+                        onSettingsChange { it.copy(readerMode = !it.readerMode) }
+                    } }
+                    item { SettingsLabelRow("Toolbars settings") { toast("Address bar position: top") } }
+                    item { SettingsLabelRow("Customize menu") { toast("Menu customization is not available") } }
+                    item { SettingsLabelRow("Customize context menu") { toast("Context menu customization is not available") } }
+                    item { SettingsLabelRow("Language", "System") { toast("Language follows Android") } }
+                    item { SettingsLabelRow("Homepage", settings.homepageUrl.ifBlank { null }) {
+                        homepageDraft = settings.homepageUrl; dialog = "homepage"
+                    } }
+                    item { SettingsLabelRow("Search settings", if (settings.searchEngineId == "google") null else settings.searchEngine.name) { dialog = "engine" } }
+                    if (settings.searchEngineId == "custom") {
+                        item { SettingsLabelRow("Custom search URL", settings.customSearchUrl.ifBlank { "Not set" }) {
+                            customSearchDraft = settings.customSearchUrl; dialog = "customSearch"
+                        } }
+                    }
+                    item { SettingsLabelRow("AI settings") { toast("AI is not enabled") } }
+                    item { SettingsLabelRow("Orientation", "System") { toast("Orientation follows the system") } }
+                    item { SettingsLabelRow("Download location") { toast("Public Downloads folder") } }
+                    item { SettingsLabelRow("Download manager") { toast("Android DownloadManager") } }
+                    item { SettingsLabelRow("External video player") { toast("Videos open in the system player") } }
+                    item { SettingsLabelRow("Clear data on exit", "Off") { toast("Browsing data is kept on exit") } }
+                    item { SettingsLabelRow("Font", if (settings.textZoom == 100) null else "${settings.textZoom}%") { dialog = "zoom" } }
+                    item { SettingsLabelRow("Gestures") { toast("Gesture settings are not available") } }
+                    item { SettingsLabelRow("Import/export bookmarks") { toast("Bookmark folders are not available") } }
+                    item { SettingsLabelRow("Import data") { toast("Nothing to import") } }
+                    item { SettingsLabelRow("Export data") { toast("Nothing to export") } }
+                    item { SettingsLabelRow("Restore tabs on startup", if (settings.restoreTabs) null else "Off") {
+                        onSettingsChange { it.copy(restoreTabs = !it.restoreTabs) }
+                    } }
+                    item { SettingsLabelRow("Set as default browser") { toast("Set Jump as the default browser in Android settings") } }
+                    item { Spacer(Modifier.height(24.dp)) }
+                }
             }
-            item {
-                SettingsRow(
-                    "Appearance",
-                    when (settings.darkMode) {
+            "Customization" -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    item { SettingsLabelRow("Homepage", settings.homepageUrl.ifBlank { null }) {
+                        homepageDraft = settings.homepageUrl; dialog = "homepage"
+                    } }
+                    item { SettingsLabelRow("Appearance", when (settings.darkMode) {
                         DarkMode.SYSTEM -> "Follow system"
                         DarkMode.LIGHT -> "Light"
                         DarkMode.DARK -> "Dark"
-                    },
-                ) { dialog = "theme" }
-            }
-            item { SectionHeader("Privacy") }
-            item {
-                SettingsSwitchRow("Ad blocking", "Blocks known ad and tracker hosts", settings.adBlock) {
-                    onSettingsChange { s -> s.copy(adBlock = it) }
+                    }) { dialog = "theme" } }
+                    item { SettingsLabelRow("Font", if (settings.textZoom == 100) null else "${settings.textZoom}%") { dialog = "zoom" } }
+                    item { SettingsLabelRow("Customize menu") { toast("Menu customization is not available") } }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
-            item {
-                SettingsSwitchRow("Block third-party cookies", "Improves privacy on some sites", settings.blockThirdPartyCookies) {
-                    onSettingsChange { s -> s.copy(blockThirdPartyCookies = it) }
+            "Privacy" -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    item { SettingsLabelRow("Do not track", if (settings.doNotTrack) "On" else null) {
+                        onSettingsChange { it.copy(doNotTrack = !it.doNotTrack) }
+                    } }
+                    item { SettingsLabelRow("Disable WebRTC") { toast("WebRTC uses Android defaults") } }
+                    item { SettingsLabelRow("Do not sell or share data",
+                        "Request the website not to sell or share my data to protect privacy",
+                    ) { toast("Do not sell requests are sent with page loads") } }
+                    item { SettingsLabelRow("Block third-party cookies", if (settings.blockThirdPartyCookies) "On" else null) {
+                        onSettingsChange { it.copy(blockThirdPartyCookies = !it.blockThirdPartyCookies) }
+                    } }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
-            item {
-                SettingsSwitchRow("Do not track", "Ask sites not to track browsing", settings.doNotTrack) {
-                    onSettingsChange { s -> s.copy(doNotTrack = it) }
+            "Advanced" -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    item { SettingsLabelRow("Save data", "Enable data-savings mode on compatible websites") {
+                        toast("Data saver is controlled by the website")
+                    } }
+                    item { SettingsLabelRow("Show sniffer button automatically") { toast("Resource sniffer is not available") } }
+                    item { SettingsLabelRow("Enable webpage debugging") { toast("Debugging is available in debug builds") } }
+                    item { SettingsLabelRow("Disable predictive back gesture") { toast("Predictive back uses Android defaults") } }
+                    item { SettingsLabelRow("Disable Custom Tabs") { toast("Custom Tabs are not supported") } }
+                    item { SettingsLabelRow("Disable safe browsing", "Safe browsing protects against malware and phishing") {
+                        toast("Safe browsing uses Android defaults")
+                    } }
+                    item { SettingsLabelRow("Ignore SSL certificate warnings", "Ignoring warnings may make connections insecure") {
+                        toast("SSL warnings are always enforced")
+                    } }
+                    item { SettingsLabelRow("JavaScript", if (settings.javaScript) null else "Off") {
+                        onSettingsChange { it.copy(javaScript = !it.javaScript) }
+                    } }
+                    item { SettingsLabelRow("Load images", if (settings.loadImages) null else "Off") {
+                        onSettingsChange { it.copy(loadImages = !it.loadImages) }
+                    } }
+                    item { SettingsLabelRow("Search suggestions", if (settings.searchSuggestions) null else "Off") {
+                        onSettingsChange { it.copy(searchSuggestions = !it.searchSuggestions) }
+                    } }
+                    item { SettingsLabelRow("Desktop site by default", if (settings.desktopMode) "On" else null) {
+                        onSettingsChange { it.copy(desktopMode = !it.desktopMode) }
+                    } }
+                    item { SettingsLabelRow("Text scaling", "${settings.textZoom}%") { dialog = "zoom" } }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
-            item {
-                SettingsRow("Clear browsing data", "History, cookies and cache") {
-                    dialog = "clear"
+            "Scripts" -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    item { SettingsLabelRow("Userscripts", "No scripts installed") { toast("Script support is not available") } }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
-            item { SectionHeader("Content") }
-            item {
-                SettingsSwitchRow("JavaScript", "Allow sites to run scripts", settings.javaScript) {
-                    onSettingsChange { s -> s.copy(javaScript = it) }
+            "About" -> {
+                LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    item { SettingsLabelRow("Jump", "Version 1.0.0") { onAbout() } }
+                    item { SettingsLabelRow("Open source licenses") { toast("MIT License") } }
+                    item { SettingsLabelRow("Terms of use") { toast("Personal and educational use") } }
+                    item { SettingsLabelRow("Privacy policy") { toast("Jump keeps browsing data on this device") } }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
-            item {
-                SettingsSwitchRow("Load images", "Show images on web pages", settings.loadImages) {
-                    onSettingsChange { s -> s.copy(loadImages = it) }
-                }
-            }
-            item {
-                SettingsSwitchRow("Search suggestions", "Fetch suggestions while typing", settings.searchSuggestions) {
-                    onSettingsChange { s -> s.copy(searchSuggestions = it) }
-                }
-            }
-            item {
-                SettingsRow("Text scaling", "${settings.textZoom}%") { dialog = "zoom" }
-            }
-            item { SectionHeader("Browsing") }
-            item {
-                SettingsSwitchRow("Desktop site", "Request desktop versions by default", settings.desktopMode) {
-                    onSettingsChange { s -> s.copy(desktopMode = it) }
-                }
-            }
-            item {
-                SettingsSwitchRow("Restore tabs", "Reopen tabs when Jump starts", settings.restoreTabs) {
-                    onSettingsChange { s -> s.copy(restoreTabs = it) }
-                }
-            }
-            item {
-                SettingsSwitchRow("Confirm before exiting", "Show the exit confirmation dialog", settings.confirmExit) {
-                    onSettingsChange { s -> s.copy(confirmExit = it) }
-                }
-            }
-            item { SectionHeader("About") }
-            item { SettingsRow("About Jump", "Version 1.0.0") { onAbout() } }
-            item { Spacer(Modifier.height(28.dp)) }
         }
     }
 
@@ -583,8 +852,8 @@ fun SettingsScreen(
             options = listOf("Follow system" to "SYSTEM", "Light" to "LIGHT", "Dark" to "DARK"),
             selected = settings.darkMode.name,
             onDismiss = { dialog = null },
-            onSelect = { value ->
-                onSettingsChange { it.copy(darkMode = DarkMode.valueOf(value)) }
+            onSelect = { id ->
+                onSettingsChange { it.copy(darkMode = DarkMode.valueOf(id)) }
                 dialog = null
             },
         )
@@ -592,13 +861,10 @@ fun SettingsScreen(
     if (dialog == "zoom") {
         ChoiceDialog(
             title = "Text scaling",
-            options = listOf("80%" to "80", "90%" to "90", "100%" to "100", "110%" to "110", "120%" to "120"),
+            options = listOf("80%" to "80", "90%" to "90", "100%" to "100", "115%" to "115", "130%" to "130", "150%" to "150"),
             selected = settings.textZoom.toString(),
             onDismiss = { dialog = null },
-            onSelect = { value ->
-                onSettingsChange { it.copy(textZoom = value.toInt()) }
-                dialog = null
-            },
+            onSelect = { id -> onSettingsChange { it.copy(textZoom = id.toInt()) }; dialog = null },
         )
     }
     if (dialog == "customSearch") {
@@ -633,18 +899,14 @@ fun SettingsScreen(
     if (dialog == "homepage") {
         JumpAlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Homepage URL") },
+            title = { Text("Homepage") },
             text = {
-                Column {
-                    Text("Leave blank to use the built-in Jump homepage.", fontSize = 13.sp)
-                    Spacer(Modifier.height(8.dp))
-                    TextField(
-                        value = homepageDraft,
-                        onValueChange = { homepageDraft = it },
-                        singleLine = true,
-                        placeholder = { Text("https://example.com") },
-                    )
-                }
+                TextField(
+                    value = homepageDraft,
+                    onValueChange = { homepageDraft = it },
+                    singleLine = true,
+                    placeholder = { Text("Leave empty for Jump Homepage") },
+                )
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -669,48 +931,37 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsRow(title: String, value: String, onClick: () -> Unit) {
+private fun SettingsLabelRow(
+    title: String,
+    subtitle: String? = null,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            title,
-            fontSize = 15.sp,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            value,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.width(6.dp))
-        ChromeIcon(JumpIcons.ChevronRight, null, size = 16, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun SettingsSwitchRow(title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { onChecked(!checked) }
-            .padding(horizontal = 20.dp, vertical = 11.dp),
+            .padding(horizontal = 16.dp, vertical = 22.5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp)
-            Spacer(Modifier.height(2.dp))
-            Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                title,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Switch(checked = checked, onCheckedChange = onChecked)
     }
 }
 

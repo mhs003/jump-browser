@@ -1082,9 +1082,11 @@ class BrowserController(
 
     fun printPage() {
         val w = activeWebView() ?: return
-        val printManager = activity.getSystemService(Context.PRINT_SERVICE) as PrintManager
-        val adapter = w.createPrintDocumentAdapter("Via Clone document")
-        printManager.print("Via Clone", adapter, PrintAttributes.Builder().build())
+        runCatching {
+            val printManager = activity.getSystemService(Context.PRINT_SERVICE) as PrintManager
+            val adapter = w.createPrintDocumentAdapter("Jump document")
+            printManager.print("Jump", adapter, PrintAttributes.Builder().build())
+        }.onFailure { notify("Printing is not available") }
     }
 
     fun savePage(type: String = "webarchive") {
