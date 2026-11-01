@@ -669,7 +669,7 @@ private fun MenuSheetContent(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
+            .height(206.dp)
             .clip(shape)
             .border(1.dp, com.jump.browser.ui.theme.JumpPressed, shape),
         color = MaterialTheme.colorScheme.surface,
@@ -679,10 +679,10 @@ private fun MenuSheetContent(
         Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth().height(164.dp),
+                modifier = Modifier.fillMaxWidth().height(148.dp),
             ) { page ->
                 Column(Modifier.fillMaxSize()) {
-                    pages[page].chunked(5).forEach { row ->
+                    pages[page].chunked(5).take(2).forEach { row ->
                         Row(Modifier.weight(1f).fillMaxWidth()) {
                             row.forEach { entry ->
                                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -710,17 +710,22 @@ private fun MenuSheetContent(
                     }
                 }
             }
+            // The reference footer overlaps the last grid row by 8dp.
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-                    .offset(y = (-14).dp),
+                    .height(52.dp)
+                    .offset(y = (-8).dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.weight(1f))
-                ChromeButton(ReferenceIcons.Power, "Exit") { onAction(MenuAction.EXIT) }
+                Box(Modifier.size(48.dp).jumpClickable { onAction(MenuAction.EXIT) }, contentAlignment = Alignment.Center) {
+                    ChromeIcon(ReferenceIcons.Power, "Exit", size = 22)
+                }
                 Spacer(Modifier.width(24.dp))
-                ChromeButton(ReferenceIcons.ChevronDown, "Close menu", onClick = onDismiss)
+                Box(Modifier.size(48.dp).jumpClickable { onDismiss() }, contentAlignment = Alignment.Center) {
+                    ChromeIcon(ReferenceIcons.ChevronDown, "Close menu", size = 22)
+                }
                 Spacer(Modifier.width(8.dp))
             }
         }
