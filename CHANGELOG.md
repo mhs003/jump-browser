@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-02
+
 ### Fixed
 
 - Floating surfaces (menu sheet, tab list, title popup, site info and
