@@ -12,3 +12,4 @@ dist/
 keystore.properties
 *.jks
 *.keystore
+build-logs/
