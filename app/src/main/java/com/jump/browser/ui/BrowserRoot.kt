@@ -548,6 +548,11 @@ fun BrowserRoot(
                                 },
                             )
                         }
+                        // Set the page flag directly: the LaunchedEffect that
+                        // usually mirrors it runs after this lambda, so relying
+                        // on it would apply the *previous* value and leave the
+                        // page dark after switching to light.
+                        controller.isDarkTheme = next
                         controller.applyDarkModeToAll()
                     }
                     MenuAction.BOOKMARKS -> { recordsTab = 0; openPage(LibraryPage.RECORDS) }

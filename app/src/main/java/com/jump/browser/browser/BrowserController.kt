@@ -560,7 +560,15 @@ class BrowserController(
     }
 
     fun applyDarkModeToAll() {
-        sessions.values.forEach { it.webView?.let(::applyDarkMode) }
+        sessions.values.forEach { session ->
+            session.webView?.let { w ->
+                applyDarkMode(w)
+                // Sites pick their theme from `prefers-color-scheme`, so the
+                // root colour scheme has to be updated as well or the page
+                // keeps the theme it was loaded with.
+                if (!w.url.isNullOrBlank() && w.url != "about:blank") syncColorScheme(w)
+            }
+        }
     }
 
     /**
