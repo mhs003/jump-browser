@@ -101,11 +101,23 @@ tad install
 Debug builds are written to `app/build/outputs/apk/debug/app-debug.apk`.
 Minified release builds are written to `app/build/outputs/apk/release/app-release.apk`.
 
-A signed, installable release is included at `dist/Jump-1.0.0.apk` with checksums
-in `dist/SHA256SUMS.txt`. Rebuild it with `tad build release` after source
-changes. It is signed with the local debug key so it can be sideloaded; use a
-private release key before publishing to a store. Development happens on the
-`master` branch.
+Release builds are published as GitHub Releases by
+`.github/workflows/release.yml`: pushing a tag such as `v1.1.0` runs the unit
+tests, checks that `version.properties` and `CHANGELOG.md` agree, builds a
+signed APK and attaches it (with a SHA-256 checksum) to the release. Local
+artifacts go to `dist/`, which is ignored by git. Local release builds are
+signed with the debug key for sideloading; CI uses the `RELEASE_KEYSTORE_BASE64`,
+`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD`
+secrets. Development happens on the `master` branch.
+
+## Versioning
+
+Jump follows [Semantic Versioning](https://semver.org). `version.properties`
+holds `version` and `versionCode`; the Gradle build reads both, so
+`versionName` and `versionCode` can never drift. Every release adds a
+`## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md` (Keep a Changelog format)
+and bumps `versionCode`; the release workflow fails if the changelog has no
+heading for the tagged version.
 
 ## Project layout
 
