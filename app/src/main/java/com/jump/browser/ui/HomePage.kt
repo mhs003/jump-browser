@@ -74,10 +74,7 @@ fun HomePage(
         animationSpec = if (dragging) snap() else tween(140),
         label = "home-pull",
     )
-    val backgroundBitmap = remember(backgroundPath) {
-        if (backgroundPath.isBlank()) null
-        else runCatching { BitmapFactory.decodeFile(backgroundPath)?.asImageBitmap() }.getOrNull()
-    }
+    val backgroundBitmap = remember(backgroundPath) { ImageCache.load(backgroundPath, minEdge = 720) }
     Box(
         modifier
             .fillMaxSize()
@@ -120,10 +117,7 @@ fun HomePage(
         ) {
             // #content top:135px (450px viewport) plus the logo intrinsic gap.
             Spacer(Modifier.height(135.dp))
-            val logoBitmap = remember(logoPath) {
-                if (logoPath.isBlank()) null
-                else runCatching { BitmapFactory.decodeFile(logoPath)?.asImageBitmap() }.getOrNull()
-            }
+            val logoBitmap = remember(logoPath) { ImageCache.load(logoPath, minEdge = 320) }
             Box(Modifier.clickable { onLogoClick() }) {
                 if (logoBitmap != null) {
                     Image(
@@ -194,10 +188,7 @@ private fun HomeShortcuts(
 
 @Composable
 private fun FavoriteTile(bookmark: Bookmark, colorsEnabled: Boolean, onClick: (Bookmark) -> Unit) {
-    val icon = remember(bookmark.iconPath) {
-        if (bookmark.iconPath.isBlank()) null
-        else runCatching { BitmapFactory.decodeFile(bookmark.iconPath)?.asImageBitmap() }.getOrNull()
-    }
+    val icon = remember(bookmark.iconPath) { ImageCache.load(bookmark.iconPath, minEdge = 54) }
     val tileColor = remember(bookmark.url) { favoriteColor(bookmark.url) }
     Column(
         Modifier

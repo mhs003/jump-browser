@@ -442,10 +442,7 @@ private fun EmptyMeme() {
 
 @Composable
 private fun BookmarkRecordIcon(bookmark: Bookmark) {
-    val icon = remember(bookmark.iconPath) {
-        if (bookmark.iconPath.isBlank()) null
-        else runCatching { BitmapFactory.decodeFile(bookmark.iconPath)?.asImageBitmap() }.getOrNull()
-    }
+    val icon = remember(bookmark.iconPath) { ImageCache.load(bookmark.iconPath, minEdge = 30) }
     Box(Modifier.size(30.dp).background(Color(0xFFE8EDFC), CircleShape), contentAlignment = Alignment.Center) {
         if (icon != null) {
             Image(

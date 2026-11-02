@@ -119,20 +119,37 @@ class BookmarkRepository(
     var bookmarks by mutableStateOf<List<Bookmark>>(emptyList())
         private set
 
+    /** True once the stored list has been read; writes wait for it. */
+    @Volatile
+    private var loaded = false
+
     init {
         // Parsed off the main thread: this used to run inside
-        // Application.onCreate and delayed the first frame.
+        // Application.onCreate and delayed the first frame. Anything added
+        // before the load finishes is merged rather than dropped.
         scope.launch {
-            val loaded = Bookmark.listFromJson(prefs.getString("bookmarks", "[]"))
-            if (bookmarks.isEmpty()) bookmarks = loaded
+            val stored = Bookmark.listFromJson(prefs.getString("bookmarks", "[]"))
+            synchronized(this@BookmarkRepository) {
+                val pending = bookmarks
+                bookmarks = stored + pending.filter { p -> stored.none { it.url == p.url } }
+                loaded = true
+            }
         }
     }
 
     fun add(title: String, url: String, folder: String = "", iconPath: String = "") {
         if (url.isBlank()) return
-        if (bookmarks.any { it.url == url }) return
-        val item = Bookmark(idGen.incrementAndGet(), title.ifBlank { url }, url, folder = folder, iconPath = iconPath)
-        bookmarks = bookmarks + item
+        synchronized(this) {
+            if (bookmarks.any { it.url == url }) return
+            val item = Bookmark(
+                idGen.incrementAndGet(),
+                title.ifBlank { url },
+                url,
+                folder = folder,
+                iconPath = iconPath,
+            )
+            bookmarks = bookmarks + item
+        }
         persist()
     }
 
@@ -194,21 +211,29 @@ class HistoryRepository(
     init {
         // Parsing a few thousand entries is not free; doing it during
         // Application.onCreate delayed first frame. Load it off the main
-        // thread and publish when ready.
+        // thread and publish when ready, merging anything recorded meanwhile.
         scope.launch {
-            val loaded = HistoryEntry.listFromJson(prefs.getString("history", "[]"))
-            if (entries.isEmpty()) entries = loaded
+            val stored = HistoryEntry.listFromJson(prefs.getString("history", "[]"))
+            synchronized(this@HistoryRepository) {
+                val pending = entries
+                entries = (pending + stored.filter { s -> pending.none { it.id == s.id } })
+                    .sortedByDescending { it.visitedAt }
+                    .take(3000)
+            }
         }
     }
 
     fun record(title: String, url: String, incognito: Boolean = false) {
         if (incognito || !url.startsWith("http")) return
         val now = System.currentTimeMillis()
-        val latest = entries.firstOrNull()
-        entries = if (latest != null && latest.url == url && now - latest.visitedAt < 120_000) {
-            listOf(latest.copy(title = title.ifBlank { latest.title }, visitedAt = now)) + entries.drop(1)
-        } else {
-            (listOf(HistoryEntry(idGen.incrementAndGet(), title.ifBlank { url }, url, now)) + entries).take(3000)
+        synchronized(this) {
+            val latest = entries.firstOrNull()
+            entries = if (latest != null && latest.url == url && now - latest.visitedAt < 120_000) {
+                listOf(latest.copy(title = title.ifBlank { latest.title }, visitedAt = now)) + entries.drop(1)
+            } else {
+                (listOf(HistoryEntry(idGen.incrementAndGet(), title.ifBlank { url }, url, now)) + entries)
+                    .take(3000)
+            }
         }
         persist()
     }

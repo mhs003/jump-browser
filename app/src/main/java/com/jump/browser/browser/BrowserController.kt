@@ -178,12 +178,32 @@ class BrowserController(
         tabs = sessions.values.map { it.info }
     }
 
+    /**
+     * Republishes a single tab.
+     *
+     * `update` used to call the full `publish()` for every change, and
+     * `onProgressChanged` fires many times per page load, so each tick rebuilt
+     * the whole list and invalidated every observer of [tabs]. Replacing just
+     * the changed entry keeps the same state for Compose while touching one
+     * element when the rest is already up to date.
+     */
+    private fun publish(id: Long) {
+        val info = sessions[id]?.info ?: return
+        val current = tabs
+        val index = current.indexOfFirst { it.id == id }
+        tabs = when {
+            index < 0 -> current + info
+            current[index] === info -> current
+            else -> current.toMutableList().also { it[index] = info }
+        }
+    }
+
     private fun session(id: Long): Session? = sessions[id]
 
     private fun update(id: Long, transform: (TabInfo) -> TabInfo) {
         val s = sessions[id] ?: return
         s.info = transform(s.info)
-        publish()
+        publish(id)
     }
 
     private fun homeUrl(): String? {
