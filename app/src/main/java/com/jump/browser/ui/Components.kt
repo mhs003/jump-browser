@@ -548,11 +548,9 @@ fun JumpAlertDialog(
             dismissOnClickOutside = false,
         ),
     ) {
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        LaunchedEffect(window) {
-            window?.setDimAmount(0f)
-            window?.setWindowAnimations(0)
-        }
+        // Real window animation, as the reference does it, instead of a
+        // suppressed platform animation plus a Compose imitation.
+        JumpDialogWindow(JumpWindowAnimation.POPUP)
         Box(
             Modifier
                 .fillMaxSize()
