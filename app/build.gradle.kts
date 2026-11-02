@@ -53,9 +53,9 @@ android {
     // own native libraries.
     splits {
         abi {
-            isEnable = false
+            isEnable = true
             reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            include("arm64-v8a", "armeabi-v7a")
             isUniversalApk = true
         }
     }
@@ -132,12 +132,7 @@ dependencies {
     implementation(libs.androidx.foundation)
     implementation(libs.androidx.animation)
 
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
     implementation(libs.zxing.core)
-    implementation(libs.androidx.webkit)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -93,11 +93,23 @@ object AdBlocker {
         return synchronized(exceptions) { host.lowercase() in exceptions }
     }
 
+    /**
+     * Request interception calls this for every subresource, so it must not
+     * scan the whole list. Checking each suffix of the host (at most a handful)
+     * against a set turns it into a constant number of hash lookups instead of
+     * dozens of `endsWith` calls per request.
+     */
     fun isBlocked(url: String?): Boolean {
         if (url == null) return false
         val host = UrlUtils.host(url).lowercase()
         if (host.isEmpty() || isSiteException(host)) return false
-        return hosts.any { blocked -> host == blocked || host.endsWith(".$blocked") }
+        if (host in hosts) return true
+        var index = host.indexOf('.')
+        while (index != -1) {
+            if (host.substring(index + 1) in hosts) return true
+            index = host.indexOf('.', index + 1)
+        }
+        return false
     }
 
     val cosmeticCss: String = """

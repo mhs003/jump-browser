@@ -116,8 +116,17 @@ class BookmarkRepository(
 ) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val idGen = AtomicLong(System.currentTimeMillis())
-    var bookmarks by mutableStateOf(Bookmark.listFromJson(prefs.getString("bookmarks", "[]")))
+    var bookmarks by mutableStateOf<List<Bookmark>>(emptyList())
         private set
+
+    init {
+        // Parsed off the main thread: this used to run inside
+        // Application.onCreate and delayed the first frame.
+        scope.launch {
+            val loaded = Bookmark.listFromJson(prefs.getString("bookmarks", "[]"))
+            if (bookmarks.isEmpty()) bookmarks = loaded
+        }
+    }
 
     fun add(title: String, url: String, folder: String = "", iconPath: String = "") {
         if (url.isBlank()) return
@@ -164,7 +173,12 @@ $rows
     }
 
     private fun persist() {
-        prefs.edit().putString("bookmarks", Bookmark.listToJson(bookmarks)).apply()
+        val snapshot = bookmarks
+        scope.launch {
+            runCatching {
+                prefs.edit().putString("bookmarks", Bookmark.listToJson(snapshot)).apply()
+            }
+        }
     }
 }
 
@@ -174,8 +188,18 @@ class HistoryRepository(
 ) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val idGen = AtomicLong(System.currentTimeMillis())
-    var entries by mutableStateOf(HistoryEntry.listFromJson(prefs.getString("history", "[]")))
+    var entries by mutableStateOf<List<HistoryEntry>>(emptyList())
         private set
+
+    init {
+        // Parsing a few thousand entries is not free; doing it during
+        // Application.onCreate delayed first frame. Load it off the main
+        // thread and publish when ready.
+        scope.launch {
+            val loaded = HistoryEntry.listFromJson(prefs.getString("history", "[]"))
+            if (entries.isEmpty()) entries = loaded
+        }
+    }
 
     fun record(title: String, url: String, incognito: Boolean = false) {
         if (incognito || !url.startsWith("http")) return
@@ -211,7 +235,15 @@ class HistoryRepository(
     }
 
     private fun persist() {
-        prefs.edit().putString("history", HistoryEntry.listToJson(entries)).apply()
+        // Serialising thousands of entries and writing them through
+        // SharedPreferences must not happen on the main thread after every
+        // page visit: it is the single biggest cost of browsing here.
+        val snapshot = entries
+        scope.launch {
+            runCatching {
+                prefs.edit().putString("history", HistoryEntry.listToJson(snapshot)).apply()
+            }
+        }
     }
 }
 
@@ -435,10 +467,15 @@ class DownloadRepository(
 
 class AppContainer(context: Context) {
     val scope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
-    val settings = SettingsRepository(context)
-    val bookmarks = BookmarkRepository(context, scope)
-    val history = HistoryRepository(context, scope)
-    val downloads = DownloadRepository(context, scope)
-    val tabs = TabStore(context)
+
+    // Constructed on first use rather than all at once: each repository opens
+    // SharedPreferences and parses JSON, and doing that for every one of them
+    // inside Application.onCreate was a measurable part of cold start. The
+    // only repository needed to draw the first frame is `settings`.
+    val settings: SettingsRepository by lazy { SettingsRepository(context) }
+    val bookmarks: BookmarkRepository by lazy { BookmarkRepository(context, scope) }
+    val history: HistoryRepository by lazy { HistoryRepository(context, scope) }
+    val downloads: DownloadRepository by lazy { DownloadRepository(context, scope) }
+    val tabs: TabStore by lazy { TabStore(context) }
     val filesDir: File = context.filesDir
 }

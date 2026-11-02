@@ -743,14 +743,16 @@ fun BrowserRoot(
                         onClearCompleted = { container.downloads.clearCompleted() },
                     )
                     LibraryPage.SNIFFER -> ResourceSnifferScreen(
-                        resources = controller.sniffedResources,
+                        // Reading the revision makes the panel recompose as the
+                        // sniffer collects entries; the list itself is plain.
+                        resources = controller.panelsRevision.let { controller.sniffedResources },
                         onBack = { page = LibraryPage.NONE },
                         onOpen = { controller.navigate(it); page = LibraryPage.NONE },
                         onDownload = { controller.downloadUrl(it) },
                         onCopy = { controller.copyUrl(it) },
                     )
                     LibraryPage.NETWORK -> NetworkLogScreen(
-                        entries = controller.networkEntries,
+                        entries = controller.panelsRevision.let { controller.networkEntries },
                         onBack = { page = LibraryPage.NONE },
                         onClear = { controller.clearNetworkLog() },
                         onOpen = { controller.copyUrl(it) },

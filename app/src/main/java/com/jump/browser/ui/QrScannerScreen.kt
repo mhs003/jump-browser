@@ -4,16 +4,19 @@ import android.Manifest
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Color as AndroidColor
+import android.graphics.ImageFormat
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
+import android.media.ImageReader
+import android.os.Handler
+import android.os.HandlerThread
+import android.view.Surface
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,11 +29,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import com.jump.browser.ui.theme.Icon
-import com.jump.browser.ui.theme.MaterialTheme
-import com.jump.browser.ui.theme.Text
-import com.jump.browser.ui.theme.TextButton
-import com.jump.browser.ui.theme.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -53,16 +50,26 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
-import java.util.concurrent.Executors
+import com.jump.browser.ui.theme.Button
+import com.jump.browser.ui.theme.Icon
+import com.jump.browser.ui.theme.Text
+import com.jump.browser.ui.theme.TextButton
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * QR scanning on the platform camera.
+ *
+ * This used to run on CameraX, which pulled four AARs plus a native image
+ * processing library into the APK. Camera2 with an `ImageReader` does the same
+ * job with code that is already part of the platform, so the release shrinks
+ * by those dependencies and their `.so` files.
+ */
 @Composable
 fun QrScannerScreen(
     onBack: () -> Unit,
     onResult: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     var granted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -78,73 +85,75 @@ fun QrScannerScreen(
     }
 
     val handled = remember { AtomicBoolean(false) }
-    val decoder = remember {
-        MultiFormatReader().apply {
-            setHints(
-                mapOf(
-                    DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
-                    DecodeHintType.TRY_HARDER to true,
-                )
-            )
-        }
-    }
-    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
-    val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            runCatching { cameraProvider?.unbindAll() }
-            analyzerExecutor.shutdown()
+    // Created during composition, not in a DisposableEffect: the effect runs
+    // after the first composition, which is exactly when AndroidView already
+    // called its factory, so the surface callback would have had nothing to
+    // attach to and the preview stayed black.
+    val preview = remember(granted) {
+        if (!granted) {
+            null
+        } else {
+            QrPreview(context) { value ->
+                if (handled.compareAndSet(false, true)) onResult(value)
+            }
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    DisposableEffect(preview) {
+        onDispose { preview?.close() }
+    }
+
+    // No opaque background on this Box: a SurfaceView is composited behind the
+    // window, so any Compose background painted here would cover the preview.
+    Box(Modifier.fillMaxSize()) {
         if (granted) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    PreviewView(ctx).apply {
+                    // TextureView rather than SurfaceView: it renders inside
+                    // the normal view tree, so it composes with the Compose
+                    // overlay instead of being a separate layer the window
+                    // background can cover.
+                    android.view.TextureView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT,
                         )
-                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        // The surface only exists once the view is attached, so
+                        // start there rather than in the factory.
+                        surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(
+                                t: android.graphics.SurfaceTexture,
+                                w: Int,
+                                h: Int,
+                            ) {
+                                preview?.attach(t)
+                            }
+
+                            override fun onSurfaceTextureSizeChanged(
+                                t: android.graphics.SurfaceTexture,
+                                w: Int,
+                                h: Int,
+                            ) = Unit
+
+                            override fun onSurfaceTextureDestroyed(t: android.graphics.SurfaceTexture): Boolean {
+                                preview?.closeCamera()
+                                return true
+                            }
+
+                            override fun onSurfaceTextureUpdated(t: android.graphics.SurfaceTexture) = Unit
+                        }
                     }
                 },
-                update = { previewView ->
-                    val future = ProcessCameraProvider.getInstance(context)
-                    future.addListener({
-                        val provider = runCatching { future.get() }.getOrNull() ?: return@addListener
-                        if (cameraProvider === provider) return@addListener
-                        cameraProvider = provider
-                        val preview = Preview.Builder().build().also {
-                            it.surfaceProvider = previewView.surfaceProvider
-                        }
-                        val analysis = ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .setTargetResolution(android.util.Size(1280, 720))
-                            .build()
-                        analysis.setAnalyzer(analyzerExecutor) { image ->
-                            analyzeQr(image, decoder, handled) { value ->
-                                mainExecutor.execute {
-                                    if (handled.compareAndSet(false, true)) {
-                                        onResult(value)
-                                    }
-                                }
-                            }
-                        }
-                        runCatching {
-                            provider.unbindAll()
-                            provider.bindToLifecycle(
-                                lifecycleOwner,
-                                CameraSelector.DEFAULT_BACK_CAMERA,
-                                preview,
-                                analysis,
-                            )
-                        }
-                    }, mainExecutor)
+                update = { view ->
+                    // `factory` runs once. When the permission arrives later the
+                    // view already exists, so attach the newly created preview
+                    // if the surface is already there.
+                    val current = preview
+                    if (current != null && view.tag !== current) {
+                        view.tag = current
+                        view.surfaceTexture?.let(current::attach)
+                    }
                 },
             )
             QrFrameOverlay()
@@ -198,45 +207,134 @@ fun QrScannerScreen(
     }
 }
 
-@Composable
-private fun QrFrameOverlay() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        androidx.compose.foundation.Canvas(Modifier.size(240.dp)) {
-            val stroke = 3.dp.toPx()
-            val len = 40.dp.toPx()
-            val w = size.width
-            val h = size.height
-            val c = Color(0xFFB9C8FF)
-            drawLine(c, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(len, 0f), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(0f, len), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(w, 0f), androidx.compose.ui.geometry.Offset(w - len, 0f), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(w, 0f), androidx.compose.ui.geometry.Offset(w, len), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(0f, h), androidx.compose.ui.geometry.Offset(len, h), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(0f, h), androidx.compose.ui.geometry.Offset(0f, h - len), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(w, h), androidx.compose.ui.geometry.Offset(w - len, h), stroke)
-            drawLine(c, androidx.compose.ui.geometry.Offset(w, h), androidx.compose.ui.geometry.Offset(w, h - len), stroke)
+/**
+ * Owns the camera device, the preview surface and the YUV reader. Everything
+ * runs on a single background thread and is torn down in [close].
+ */
+private class QrPreview(
+    private val context: Context,
+    private val onDecoded: (String) -> Unit,
+) {
+    private val thread = HandlerThread("qr-scan").apply { start() }
+    private val handler = Handler(thread.looper)
+    private var device: CameraDevice? = null
+    private var session: CameraCaptureSession? = null
+    private var reader: ImageReader? = null
+    private var request: CaptureRequest? = null
+    private var closed = false
+    private var lastTextureSize: android.util.Size? = null
+
+    private val decoder = MultiFormatReader().apply {
+        setHints(
+            mapOf(
+                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
+                DecodeHintType.TRY_HARDER to true,
+            ),
+        )
+    }
+
+    fun attach(texture: android.graphics.SurfaceTexture?) {
+        if (texture == null) return
+        val size = lastTextureSize ?: android.util.Size(0, 0)
+        texture.setDefaultBufferSize(
+            if (size.width > 0) size.width else 1280,
+            if (size.height > 0) size.height else 720,
+        )
+        open(Surface(texture))
+    }
+
+    private fun open(output: Surface) {
+        if (closed) return
+        val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val cameraId = manager.cameraIdList.firstOrNull { id ->
+            manager.getCameraCharacteristics(id)
+                .get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
+        } ?: manager.cameraIdList.firstOrNull() ?: return
+
+        val characteristics = manager.getCameraCharacteristics(cameraId)
+        val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        var width = 1280
+        var height = 720
+        map?.getOutputSizes(ImageFormat.YUV_420_888)?.let { sizes ->
+            val best = sizes.filter { it.width <= 1920 }
+                .maxByOrNull { it.width * it.height } ?: sizes.first()
+            width = best.width
+            height = best.height
+        }
+        lastTextureSize = android.util.Size(width, height)
+        val analysis = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2)
+        reader = analysis
+        analysis.setOnImageAvailableListener({ r ->
+            val image = r.acquireLatestImage() ?: return@setOnImageAvailableListener
+            try {
+                decode(image)
+            } catch (_: Throwable) {
+                // A malformed frame is expected while the camera warms up.
+            } finally {
+                image.close()
+            }
+        }, handler)
+
+        @Suppress("MissingPermission")
+        runCatching {
+            manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
+                override fun onOpened(camera: CameraDevice) {
+                    if (closed) {
+                        camera.close()
+                        return
+                    }
+                    device = camera
+                    runCatching { startSession(camera, output, analysis.surface) }
+                }
+
+                override fun onDisconnected(camera: CameraDevice) = camera.close()
+
+                override fun onError(camera: CameraDevice, error: Int) {
+                    camera.close()
+                }
+            }, handler)
         }
     }
-}
 
-private fun analyzeQr(
-    image: ImageProxy,
-    decoder: MultiFormatReader,
-    handled: AtomicBoolean,
-    onDecoded: (String) -> Unit,
-) {
-    if (handled.get()) {
-        image.close()
-        return
+    private fun startSession(camera: CameraDevice, preview: Surface, analysis: Surface) {
+        val surfaces = listOf(preview, analysis)
+        camera.createCaptureSession(
+            surfaces,
+            object : CameraCaptureSession.StateCallback() {
+                override fun onConfigured(s: CameraCaptureSession) {
+                    if (closed) {
+                        s.close()
+                        return
+                    }
+                    session = s
+                    val req = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                        surfaces.forEach { addTarget(it) }
+                        set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                    }
+                    request = req.build()
+                    runCatching { s.setRepeatingRequest(req.build(), null, handler) }
+                }
+
+                override fun onConfigureFailed(s: CameraCaptureSession) {
+                    s.close()
+                }
+            },
+            handler,
+        )
     }
-    try {
-        val yPlane = image.planes[0]
+
+    /**
+     * Luma plane only: ZXing works on luminance, so chroma is ignored. The
+     * plane is copied row by row because the buffer may be padded.
+     */
+    private fun decode(image: android.media.Image) {
+        val plane = image.planes[0]
+        val buffer = plane.buffer
+        buffer.rewind()
         val width = image.width
         val height = image.height
-        val buffer = yPlane.buffer
-        buffer.rewind()
-        val rowStride = yPlane.rowStride
-        val pixelStride = yPlane.pixelStride
+        val rowStride = plane.rowStride
+        val pixelStride = plane.pixelStride
         val data = ByteArray(width * height)
         if (pixelStride == 1 && rowStride == width) {
             buffer.get(data, 0, minOf(buffer.remaining(), data.size))
@@ -256,16 +354,58 @@ private fun analyzeQr(
         }
         val source = PlanarYUVLuminanceSource(data, width, height, 0, 0, width, height, false)
         val bitmap = BinaryBitmap(HybridBinarizer(source))
-        val result = runCatching { decoder.decodeWithState(bitmap) }.getOrNull()
-        if (result != null && result.text.isNotBlank()) onDecoded(result.text)
-    } finally {
+        val result = runCatching { decoder.decodeWithState(bitmap) }.getOrNull() ?: return
         runCatching { decoder.reset() }
-        image.close()
+        result.text?.takeIf { it.isNotBlank() }?.let(onDecoded)
+    }
+
+    /** Stops the camera but keeps the object usable if the surface returns. */
+    fun closeCamera() {
+        runCatching { session?.stopRepeating() }
+        runCatching { session?.close() }
+        runCatching { device?.close() }
+        runCatching { reader?.close() }
+        session = null
+        device = null
+        reader = null
+    }
+
+    fun close() {
+        closed = true
+        runCatching { session?.stopRepeating() }
+        runCatching { session?.close() }
+        runCatching { device?.close() }
+        runCatching { reader?.close() }
+        session = null
+        device = null
+        reader = null
+        thread.quitSafely()
     }
 }
 
 private fun pasteLink(context: Context, onResult: (String) -> Unit) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val text = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()?.trim()
-    if (!text.isNullOrBlank()) onResult(text)
+    val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val text = clip.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+    if (text.isNotBlank()) onResult(text)
+}
+
+@Composable
+private fun QrFrameOverlay() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.size(240.dp)) {
+            val stroke = 3.dp.toPx()
+            val len = 40.dp.toPx()
+            val w = size.width
+            val h = size.height
+            val c = Color(0xFFB9C8FF)
+            drawLine(c, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(len, 0f), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(0f, len), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(w, 0f), androidx.compose.ui.geometry.Offset(w - len, 0f), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(w, 0f), androidx.compose.ui.geometry.Offset(w, len), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(0f, h), androidx.compose.ui.geometry.Offset(len, h), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(0f, h), androidx.compose.ui.geometry.Offset(0f, h - len), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(w, h), androidx.compose.ui.geometry.Offset(w - len, h), stroke)
+            drawLine(c, androidx.compose.ui.geometry.Offset(w, h), androidx.compose.ui.geometry.Offset(w, h - len), stroke)
+        }
+    }
 }

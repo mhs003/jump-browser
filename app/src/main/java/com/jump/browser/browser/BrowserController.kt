@@ -40,8 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.webkit.WebSettingsCompat
-import androidx.webkit.WebViewFeature
 import com.jump.browser.ui.JumpToast
 import com.jump.browser.data.AppContainer
 import com.jump.browser.data.TabSnapshot
@@ -124,11 +122,30 @@ class BrowserController(
     private var attached: WebView? = null
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var networkLogging = false
-    private val networkStart = HashMap<String, Long>()
-    var networkEntries by mutableStateOf<List<NetworkEntry>>(emptyList())
+
+    /**
+     * In-flight request start times, keyed by URL.
+     *
+     * Bounded and self-pruning: a cancelled or redirected request never
+     * produces a response, so without eviction this grew for the whole session
+     * and made every page load slower than the last.
+     */
+    private val networkStart = object : LinkedHashMap<String, Long>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>): Boolean =
+            size > 200
+    }
+
+    // The debug panels read these; they are plain values published through a
+    // bumped revision instead of Compose state, because assigning a new list on
+    // every network response invalidated every composable that observes this
+    // controller — even while the panels were closed.
+    private var networkSnapshot: List<NetworkEntry> = emptyList()
+    private var sniffedSnapshot: List<SniffedResource> = emptyList()
+    var panelsRevision by mutableStateOf(0)
         private set
-    var sniffedResources by mutableStateOf<List<SniffedResource>>(emptyList())
-        private set
+
+    val networkEntries: List<NetworkEntry> get() = networkSnapshot
+    val sniffedResources: List<SniffedResource> get() = sniffedSnapshot
 
     var tabs by mutableStateOf<List<TabInfo>>(emptyList())
         private set
@@ -584,17 +601,14 @@ class BrowserController(
      */
     private fun applyDarkMode(w: WebView) {
         val dark = isDarkTheme
-        runCatching {
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-                WebSettingsCompat.setAlgorithmicDarkeningAllowed(w.settings, dark)
-            } else if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                WebSettingsCompat.setForceDark(
-                    w.settings,
-                    if (dark) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF,
-                )
-            }
-        }
-        if (Build.VERSION.SDK_INT in 29..32) {
+        // Android 13 exposes algorithmic darkening on WebSettings directly.
+        // On Android 10-12 the older force-dark flag is the same engine
+        // feature under a different name. Using the platform API avoids
+        // depending on androidx.webkit (which drags AppCompat in for a single
+        // setting).
+        if (Build.VERSION.SDK_INT >= 33) {
+            runCatching { w.settings.isAlgorithmicDarkeningAllowed = dark }
+        } else if (Build.VERSION.SDK_INT >= 29) {
             @Suppress("DEPRECATION")
             runCatching {
                 w.settings.forceDark =
@@ -725,9 +739,11 @@ class BrowserController(
 
     /** Resource sniffer runs while the panel is open only. */
     fun startResourceSniffing() {
-        sniffedResources = emptyList()
+        sniffedSnapshot = emptyList()
+        networkSnapshot = emptyList()
         networkStart.clear()
         networkLogging = true
+        panelsRevision++
     }
 
     fun stopResourceSniffing() {
@@ -735,7 +751,9 @@ class BrowserController(
     }
 
     fun clearNetworkLog() {
-        networkEntries = emptyList()
+        networkSnapshot = emptyList()
+        sniffedSnapshot = emptyList()
+        panelsRevision++
     }
 
     private fun noteRequest(url: String?, method: String?) {
@@ -762,11 +780,14 @@ class BrowserController(
         val sniffable = sniffableMime(m, url)
         if (sniffable) {
             val guess = resourceSize(status)
-            if (sniffedResources.none { it.url == url }) {
-                sniffedResources = (sniffedResources + SniffedResource(url, m, guess)).takeLast(500)
+            if (sniffedSnapshot.none { it.url == url }) {
+                sniffedSnapshot = (sniffedSnapshot + SniffedResource(url, m, guess)).takeLast(500)
             }
         }
-        networkEntries = (listOf(entry) + networkEntries).take(400)
+        networkSnapshot = (listOf(entry) + networkSnapshot).take(400)
+        // Only nudge the UI while a panel is actually showing the data;
+        // otherwise page loads would recompose the chrome for nothing.
+        if (networkLogging) panelsRevision++
     }
 
     private fun applyAdBlocking(view: WebView) {
