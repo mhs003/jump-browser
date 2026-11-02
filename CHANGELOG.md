@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-02
+
 ### Fixed
 
 - The release build no longer dies with "Gradle build daemon has been stopped"
