@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: write
+  # Required for actions/upload-artifact; without it the upload step fails.
+  actions: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -24,6 +26,9 @@ jobs:
     timeout-minutes: 40
     env:
       KEYSTORE_SECRET: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      # A workflow-level env is visible to `with:` expressions too, unlike a
+      # bare shell variable set inside a run block.
+      RUNNER_HOME_LOG: ${{ runner.temp }}/build.log
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -121,22 +126,22 @@ jobs:
 
       - name: Build release APK
         run: |
-          set -o pipefail
-          ./gradlew assembleRelease --no-daemon 2>&1 | tee "$RUNNER_TEMP/build.log"
+          set -euo pipefail
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee "$RUNNER_HOME_LOG"
 
       - name: Report build failure
         if: failure()
         run: |
           # Annotations are visible without signing in, unlike the job log, so
           # echo the first real Gradle failure line there too.
-          line="$(grep -m1 -E '^e: |What went wrong|Caused by|> Task .* FAILED|Could not (resolve|download|install)' "$RUNNER_TEMP/build.log" || true)"
+          line="$(grep -m1 -E '^e: |What went wrong|Caused by|> Task .* FAILED|Could not (resolve|download|install)' "$RUNNER_HOME_LOG" || true)"
           if [ -n "$line" ]; then
             echo "::error title=Gradle failure::$line"
           fi
           {
             echo "## Release build failed"
             echo '```'
-            grep -A 20 -E "What went wrong|FAILURE:" "$RUNNER_TEMP/build.log" | head -60 || tail -60 "$RUNNER_TEMP/build.log"
+            grep -A 20 -E "What went wrong|FAILURE:" "$RUNNER_HOME_LOG" | head -60 || tail -60 "$RUNNER_HOME_LOG"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -145,7 +150,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-build-log
-          path: ${{ runner.temp }}/build.log
+          path: ${{ env.RUNNER_HOME_LOG }}
           if-no-files-found: ignore
           retention-days: 5
 

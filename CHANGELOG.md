@@ -10,6 +10,13 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- The release build no longer dies with "Gradle build daemon has been stopped"
+  in CI: the daemon now gets enough heap for R8 and resource shrinking.
+- `scripts/bump-version.sh` always adds the new changelog section, even when
+  `[Unreleased]` has no entries.
+
 ## [1.0.3] - 2026-11-02
 
 ### Changed
