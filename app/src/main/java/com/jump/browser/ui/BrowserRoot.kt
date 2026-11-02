@@ -10,19 +10,13 @@ import android.net.Uri
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility as AnimVis
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -799,18 +793,6 @@ fun BrowserRoot(
             )
         }
 
-        if (titleMenu) {
-            LaunchedEffect(Unit) { showMenu = false; showTabs = false }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f))
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                    ) { titleMenu = false },
-            )
-        }
         if (searchEngineDialog) {
             SearchEngineDialog(
                 selected = settings.searchEngineId,
@@ -823,46 +805,17 @@ fun BrowserRoot(
             )
         }
 
-        AnimVis(
+        TitleMenuPopup(
             visible = titleMenu,
-            enter = fadeIn(tween(240)) + scaleIn(
-                initialScale = 0.9f,
-                transformOrigin = TransformOrigin(0.5f, 1f),
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            ) + slideInVertically(
-                animationSpec = tween(240),
-                initialOffsetY = { (it * 0.1f).toInt() },
-            ),
-            exit = fadeOut(tween(240, easing = FastOutLinearInEasing)) + scaleOut(
-                targetScale = 0.9f,
-                transformOrigin = TransformOrigin(0.5f, 1f),
-                animationSpec = tween(240),
-            ) + slideOutVertically(
-                animationSpec = tween(240),
-                targetOffsetY = { (it * 0.1f).toInt() },
-            ),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .offset(
-                    x = 6.dp,
-                    y = with(density) {
-                        WindowInsets.statusBars.getTop(density).toDp()
-                    } + 48.dp,
-                ),
-        ) {
-            TitleActionPopup(
-                showCopy = active?.isHome == false && active?.url?.isNotBlank() == true,
-                onCopy = {
-                    titleMenu = false
-                    controller.copyUrl(active?.url)
-                },
-                onPaste = { pasteIntoAddress() },
-                onPasteAndGo = { pasteAndGo() },
-            )
-        }
+            showCopy = active?.isHome == false && active?.url?.isNotBlank() == true,
+            onCopy = {
+                titleMenu = false
+                controller.copyUrl(active?.url)
+            },
+            onPaste = { pasteIntoAddress() },
+            onPasteAndGo = { pasteAndGo() },
+            onDismiss = { titleMenu = false },
+        )
 
         JumpToastHost()
     }
@@ -905,104 +858,24 @@ fun BrowserRoot(
         )
     }
 
-    if (siteInfoDialog) {
-        val tab = active
-        val topInset = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.32f))
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                ) { siteInfoDialog = false },
-        ) {
-            Surface(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(top = topInset + 48.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
-                shadowElevation = 0.dp,
-            ) {
-                Column(Modifier.fillMaxWidth()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            BasicText(
-                                text = if (tab?.isHome == true) "Homepage" else (tab?.title ?: "Site info"),
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (tab?.isHome != true) {
-                                Spacer(Modifier.height(4.dp))
-                                BasicText(
-                                    text = tab?.url ?: "",
-                                    style = TextStyle(
-                                        fontSize = 14.sp,
-                                        color = Color(0xFF008000),
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        if (tab?.isHome != true) {
-                            ChromeButton(
-                                icon = ReferenceIcons.Clock,
-                                contentDescription = "History for this site",
-                                size = 22,
-                                onClick = {
-                                    siteInfoDialog = false
-                                    recordsTab = 1
-                                    openPage(LibraryPage.RECORDS)
-                                },
-                            )
-                            ChromeButton(
-                                icon = ReferenceIcons.CustomizeMenu,
-                                contentDescription = "Site configuration",
-                                size = 22,
-                                onClick = {
-                                    JumpToast.show(context, "Site configuration is not available")
-                                },
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (tab?.isHome != true) {
-                        SiteInfoAction("View certificate") {
-                            JumpToast.show(context, if (tab?.secure == true) "Connection is secure" else "Connection is not secure")
-                            siteInfoDialog = false
-                        }
-                        SiteInfoAction("View Cookies") {
-                            JumpToast.show(context, "No site cookies to display")
-                            siteInfoDialog = false
-                        }
-                    }
-                    SiteInfoAction("Site configuration") {
-                        JumpToast.show(context, "Site configuration is not available")
-                    }
-                    if (tab?.isHome != true) {
-                        SiteInfoAction("Show reader") {
-                            siteInfoDialog = false
-                            controller.extractReader { data ->
-                                if (data == null) JumpToast.show(context, "Reader mode is not available for this page")
-                                else reader = data
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                }
+    SiteInfoOverlay(
+        visible = siteInfoDialog,
+        tab = active,
+        onDismiss = { siteInfoDialog = false },
+        onHistory = {
+            siteInfoDialog = false
+            recordsTab = 1
+            openPage(LibraryPage.RECORDS)
+        },
+        onToast = { JumpToast.show(context, it) },
+        onReader = {
+            siteInfoDialog = false
+            controller.extractReader { data ->
+                if (data == null) JumpToast.show(context, "Reader mode is not available for this page")
+                else reader = data
             }
-        }
-    }
+        },
+    )
 
     if (aboutDialog) {
         JumpAlertDialog(
@@ -1237,6 +1110,125 @@ private fun SuggestionRow(
         }
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             ChromeIcon(ReferenceIcons.OpenArrow, null, size = 22)
+        }
+    }
+}
+
+/**
+ * Site information panel. It drops from the title bar like a window: alpha
+ * decelerates while it slides down 10% of its height and scales 0.9→1.0 around
+ * its top edge, the mirror of the title popup. The scrim fades with it.
+ */
+@Composable
+private fun SiteInfoOverlay(
+    visible: Boolean,
+    tab: TabInfo?,
+    onDismiss: () -> Unit,
+    onHistory: () -> Unit,
+    onToast: (String) -> Unit,
+    onReader: () -> Unit,
+) {
+    val holder = remember { OverlayVisibility() }
+    SideEffect {
+        if (visible) holder.show() else holder.hide()
+    }
+    val progressState = rememberOverlayMotion(
+        holder,
+        ReferenceMotion.POPUP_DURATION_MS,
+        ReferenceMotion.SHEET_EASING,
+    )
+    val closed by progressState
+    val density = LocalDensity.current
+    val topInset = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    val alpha = ReferenceMotion.DECELERATE_EASING.transform(closed.coerceIn(0f, 1f))
+    val rise = ReferenceMotion.POPUP_IMAGE_EASING.transform(closed.coerceIn(0f, 1f))
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                this.alpha = alpha
+                scaleX = 1f - 0.1f * rise
+                scaleY = 1f - 0.1f * rise
+                translationY = -rise * 24f
+                transformOrigin = TransformOrigin(0.5f, 0f)
+            }
+            .background(Color.Black.copy(alpha = 0.32f * alpha))
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+            ) { onDismiss() },
+    ) {
+        Surface(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(top = topInset + 48.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+            shadowElevation = 0.dp,
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        BasicText(
+                            text = if (tab?.isHome == true) "Homepage" else (tab?.title ?: "Site info"),
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (tab?.isHome != true) {
+                            Spacer(Modifier.height(4.dp))
+                            BasicText(
+                                text = tab?.url ?: "",
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF008000),
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (tab?.isHome != true) {
+                        ChromeButton(
+                            icon = ReferenceIcons.Clock,
+                            contentDescription = "History for this site",
+                            size = 22,
+                            onClick = onHistory,
+                        )
+                        ChromeButton(
+                            icon = ReferenceIcons.CustomizeMenu,
+                            contentDescription = "Site configuration",
+                            size = 22,
+                            onClick = { onToast("Site configuration is not available") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                if (tab?.isHome != true) {
+                    SiteInfoAction("View certificate") {
+                        onToast(if (tab?.secure == true) "Connection is secure" else "Connection is not secure")
+                        onDismiss()
+                    }
+                    SiteInfoAction("View Cookies") {
+                        onToast("No site cookies to display")
+                        onDismiss()
+                    }
+                }
+                SiteInfoAction("Site configuration") {
+                    onToast("Site configuration is not available")
+                }
+                if (tab?.isHome != true) {
+                    SiteInfoAction("Show reader") { onReader() }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
         }
     }
 }
