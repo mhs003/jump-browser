@@ -802,10 +802,11 @@ fun BrowserRoot(
                 onDismissRequest = { aiDialog = false },
                 title = { Text("AI summary") },
                 text = {
+                    // JumpAlertDialog already scrolls its content; adding
+                    // another scrollable here measured it with unbounded height
+                    // and crashed.
                     androidx.compose.foundation.text.selection.SelectionContainer {
-                        Column(
-                            Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
-                        ) { Text(aiAnswer, fontSize = 14.sp) }
+                        Text(aiAnswer, fontSize = 14.sp)
                     }
                 },
                 confirmButton = { JumpDialogButton(onClick = { aiDialog = false }) { Text("Close") } },

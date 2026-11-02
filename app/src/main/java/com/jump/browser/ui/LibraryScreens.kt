@@ -1380,7 +1380,8 @@ fun SettingsScreen(
             onDismissRequest = { dialog = null },
             title = { Text("AI settings") },
             text = {
-                Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                // JumpAlertDialog already scrolls its content.
+                Column {
                     Text(
                         "Jump has no AI backend of its own. Point it at any service that " +
                             "speaks the OpenAI chat API; the key is stored on this device only.",
@@ -1508,7 +1509,8 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                    // JumpAlertDialog already scrolls its content.
+                Column {
                         Text(
                             "Stored on this device, encrypted with the system keystore.",
                             fontSize = 12.sp,
