@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-02
+
 ### Fixed
 
 - The release workflow now validates the signing secrets before building and
