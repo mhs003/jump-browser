@@ -89,9 +89,31 @@ jobs:
             echo "::warning::RELEASE_KEYSTORE_BASE64 is not set; signing with the debug key."
             exit 0
           fi
-          printf '%s' "$KEYSTORE_SECRET" | base64 -d > "$RUNNER_TEMP/release.jks"
+          for name in RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              case "$name" in
+                RELEASE_KEYSTORE_PASSWORD) missing=KEYSTORE_PASSWORD ;;
+                RELEASE_KEY_ALIAS) missing=KEY_ALIAS ;;
+                *) missing=KEY_PASSWORD ;;
+              esac
+              echo "::error::secret $name is empty; set it or remove RELEASE_KEYSTORE_BASE64 so the debug key is used"
+              exit 1
+            fi
+          done
+
+          jks="$RUNNER_TEMP/release.jks"
+          printf '%s' "$KEYSTORE_SECRET" | base64 -d > "$jks"
+
+          # Fail here, with a readable message, rather than 70 seconds later
+          # inside :app:packageRelease with "keystore password was incorrect".
+          keytool -list \
+            -keystore "$jks" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null \
+            || { echo "::error::RELEASE_KEYSTORE_PASSWORD / RELEASE_KEY_ALIAS do not open the stored keystore"; exit 1; }
+
           {
-            echo "storeFile=$RUNNER_TEMP/release.jks"
+            echo "storeFile=$jks"
             echo "storePassword=$KEYSTORE_PASSWORD"
             echo "keyAlias=$KEY_ALIAS"
             echo "keyPassword=$KEY_PASSWORD"

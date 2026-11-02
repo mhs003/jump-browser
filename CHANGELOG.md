@@ -10,6 +10,12 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- The release workflow now validates the signing secrets before building and
+  reports which one is wrong, instead of failing later inside
+  `packageRelease` with "keystore password was incorrect".
+
 ## [1.0.1] - 2026-11-02
 
 ### Fixed
