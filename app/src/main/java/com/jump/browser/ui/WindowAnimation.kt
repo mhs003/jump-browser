@@ -21,6 +21,9 @@ enum class JumpWindowAnimation(val style: Int) {
 
     /** Slide from the bottom edge used by the menu sheet and tab list. */
     SHEET(R.style.Animation_Jump_Sheet),
+
+    /** The sheet's dim layer: a 150ms fade with no movement. */
+    SCRIM(R.style.Animation_Jump_Scrim),
 }
 
 /**

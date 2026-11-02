@@ -823,45 +823,20 @@ fun BrowserRoot(
             )
         }
 
-        AnimVis(
-            visible = titleMenu,
-            enter = fadeIn(tween(240)) + scaleIn(
-                initialScale = 0.9f,
-                transformOrigin = TransformOrigin(0.5f, 1f),
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            ) + slideInVertically(
-                animationSpec = tween(240),
-                initialOffsetY = { (it * 0.1f).toInt() },
-            ),
-            exit = fadeOut(tween(240, easing = FastOutLinearInEasing)) + scaleOut(
-                targetScale = 0.9f,
-                transformOrigin = TransformOrigin(0.5f, 1f),
-                animationSpec = tween(240),
-            ) + slideOutVertically(
-                animationSpec = tween(240),
-                targetOffsetY = { (it * 0.1f).toInt() },
-            ),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .offset(
-                    x = 6.dp,
-                    y = with(density) {
-                        WindowInsets.statusBars.getTop(density).toDp()
-                    } + 48.dp,
-                ),
-        ) {
-            TitleActionPopup(
-                showCopy = active?.isHome == false && active?.url?.isNotBlank() == true,
-                onCopy = {
-                    titleMenu = false
-                    controller.copyUrl(active?.url)
-                },
-                onPaste = { pasteIntoAddress() },
-                onPasteAndGo = { pasteAndGo() },
-            )
+        if (titleMenu) {
+            TopAnchoredPopup(onDismiss = { titleMenu = false }) {
+                Box(Modifier.padding(start = 6.dp)) {
+                TitleActionPopup(
+                    showCopy = active?.isHome == false && active?.url?.isNotBlank() == true,
+                    onCopy = {
+                        titleMenu = false
+                        controller.copyUrl(active?.url)
+                    },
+                    onPaste = { pasteIntoAddress() },
+                    onPasteAndGo = { pasteAndGo() },
+                )
+                }
+            }
         }
 
         JumpToastHost()
@@ -907,21 +882,13 @@ fun BrowserRoot(
 
     if (siteInfoDialog) {
         val tab = active
-        val topInset = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.32f))
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                ) { siteInfoDialog = false },
+        // A real window with the popup animation, anchored under the title bar.
+        TopAnchoredPopup(
+            onDismiss = { siteInfoDialog = false },
+            contentAlignment = Alignment.TopCenter,
         ) {
             Surface(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(top = topInset + 48.dp),
+                Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
                 shadowElevation = 0.dp,

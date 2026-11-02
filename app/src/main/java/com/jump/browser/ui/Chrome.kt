@@ -82,6 +82,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
@@ -556,23 +558,53 @@ fun MenuOverlay(
     onAction: (MenuAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val slidePx = with(LocalDensity.current) { 120.dp.roundToPx() }
-    if (visible) {
+    if (!visible) return
+    // A real window, so the sheet animates with the platform's window
+    // animation. Its scrim is a second window underneath: it eases in over
+    // 150ms with no slide, so the dim travels with the sheet instead of
+    // popping on ahead of it.
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        ),
+        content = {
+            JumpDialogWindow(JumpWindowAnimation.SCRIM)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.20f))
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                    ) { onDismiss() },
+            )
+        },
+    )
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        JumpDialogWindow(JumpWindowAnimation.SHEET)
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.20f))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = slideInVertically(tween(220, easing = FastOutLinearInEasing)) { slidePx } + fadeIn(tween(220)),
-                exit = slideOutVertically(tween(220, easing = FastOutLinearInEasing)) { slidePx } + fadeOut(tween(180)),
-                modifier = Modifier
+            Box(
+                Modifier
                     .padding(horizontal = 1.dp)
                     .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() }),
             ) {
@@ -743,8 +775,18 @@ fun TabPopup(
     onDismiss: () -> Unit,
     bottomInset: Int,
 ) {
-    val tabSlidePx = with(LocalDensity.current) { 120.dp.roundToPx() }
-    if (visible) {
+    if (!visible) return
+    // A real window, like the menu sheet, so both animate identically.
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        JumpDialogWindow(JumpWindowAnimation.SCRIM)
         Box(
             Modifier
                 .fillMaxSize()
@@ -754,14 +796,28 @@ fun TabPopup(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
+        )
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        JumpDialogWindow(JumpWindowAnimation.SHEET)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = slideInVertically(tween(160, easing = FastOutLinearInEasing)) { tabSlidePx } + fadeIn(tween(160)),
-                exit = slideOutVertically(tween(160, easing = FastOutLinearInEasing)) { tabSlidePx } + fadeOut(tween(160)),
-                modifier = Modifier,
-            ) {
                 Surface(
                     Modifier
                         .fillMaxWidth()
@@ -812,7 +868,6 @@ fun TabPopup(
                         }
                     }
                 }
-            }
         }
     }
 }
