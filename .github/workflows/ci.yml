@@ -34,6 +34,31 @@ jobs:
             exit 1
           fi
 
+      - name: Check the version was bumped
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          # A PR may legitimately keep the version; a push to master may not.
+          # Every push ships a new installable build, so versionCode must move
+          # or devices cannot update over each other.
+          if [ "$EVENT" != "push" ]; then
+            echo "not a push; skipping the bump check"
+            exit 0
+          fi
+          git fetch --no-tags --depth=2 origin master
+          prev="$(git show HEAD~1:version.properties 2>/dev/null | sed -n 's/^versionCode=//p' | tr -d '\r' || true)"
+          now="$(sed -n 's/^versionCode=//p' version.properties | tr -d '\r')"
+          if [ -z "$prev" ]; then
+            echo "no previous version.properties (first push); nothing to compare"
+            exit 0
+          fi
+          if [ "$prev" -ge "$now" ]; then
+            echo "::error::versionCode did not increase ($prev -> $now). Run scripts/bump-version.sh <patch|minor|major> before pushing."
+            exit 1
+          fi
+          echo "versionCode $prev -> $now"
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:

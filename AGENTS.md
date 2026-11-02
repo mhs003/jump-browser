@@ -79,9 +79,18 @@ app/src/main/java/com/jump/browser/
 - When changing the chrome, verify the homepage, a loaded page, the address bar,
   the tab popup, and the menu sheet.
 - Keep commits coherent and descriptive.
+- **Every push to `master` bumps the version first.** Run
+  `scripts/bump-version.sh patch` (or `minor`/`major`) before committing; it
+  raises `versionCode`, sets `version` in `version.properties`, and moves the
+  `[Unreleased]` changelog entries under a dated `## [x.y.z]` heading. CI fails
+  a push whose `versionCode` did not increase.
+- **Publishing a release is a tag, not a push.** Pushing to `master` only runs
+  CI. Use `scripts/release.sh [patch|minor|major|X.Y.Z]`, which bumps the
+  version, commits, and pushes a matching `vX.Y.Z` tag; the tag starts
+  `.github/workflows/release.yml`, which publishes the GitHub release.
 - Release builds are minified, resource-shrunk and signed with the local debug
   key for sideloading: `tad build release`.
-- Keep `dist/Jump-1.0.0.apk` and `dist/SHA256SUMS.txt` in sync with the release
-  build when producing a user-facing artifact.
+- Keep `dist/Jump-<version>.apk` and `dist/SHA256SUMS.txt` in sync with the
+  release build when producing a local artifact.
 - Screenshots live in `docs/screenshots/`; README references only files inside
   this repository.
