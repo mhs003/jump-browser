@@ -164,14 +164,14 @@ Motion is part of the product, not decoration.
 |---|---|---|
 | Address bar and suggestions | 240ms fade | 240ms fade |
 | Menu scrim | 160ms fade, 20% dim | 160ms fade |
-| Menu sheet | 180ms window slide up from the bottom edge | 180ms window slide down |
+| Menu sheet | 120ms fade | 120ms fade |
 | Tab popup scrim | 160ms fade, 25% dim | 160ms fade |
-| Tab popup panel | 180ms window slide up from the bottom edge | 180ms window slide down |
+| Tab popup panel | 120ms fade | 120ms fade |
 | Library/settings page enter | 220ms: new page from 100% right, old page to −30% left | — |
 | Library/settings page back | 220ms: previous page from −30% left, current page to 100% right | — |
 | Interactive page swipe | Page follows finger; 46% threshold | 300ms settle if released early |
-| Dialog / popup / site info | 240ms: fade, 10% rise, 0.9→1.0 bottom scale, platform bounce interpolator | same animation reversed |
-| Sheet scrim | 150ms fade | 150ms fade |
+| Dialog / popup / site info | 120ms fade | 120ms fade |
+| Sheet scrim | 120ms fade | 120ms fade |
 | Toast | 180ms fade + 20dp rise | 180ms fade + 20dp fall |
 | Context menu | 100ms fade | 100ms fade |
 
