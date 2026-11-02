@@ -84,6 +84,15 @@ class MainActivity : ComponentActivity() {
             // colours, `nightMode` decides whether web pages are darkened.
             // Merging them (dark = nightMode || darkMode) made the bottom-sheet
             // Night toggle impossible to turn off while Theme was set to Dark.
+            val orientationMode = settings.orientation
+            LaunchedEffect(orientationMode) {
+                requestedOrientation = when (orientationMode) {
+                    "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    "sensor" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+                    else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                }
+            }
             val dark = when (settings.darkMode) {
                 DarkMode.SYSTEM -> systemDark
                 DarkMode.LIGHT -> false

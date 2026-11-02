@@ -161,6 +161,8 @@ data class AppSettings(
     val savePasswords: Boolean = false,
     /** Assistant endpoint settings; empty means not configured. */
     val ai: ChatSettings = ChatSettings(),
+    /** "system", "portrait", "landscape" or "sensor". */
+    val orientation: String = "system",
     val fullscreen: Boolean = false,
     val customHomeCss: String = "",
     val homepageLogoPath: String = "",

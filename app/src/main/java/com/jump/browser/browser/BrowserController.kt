@@ -1344,6 +1344,30 @@ class BrowserController(
         findState = 0 to 0
     }
 
+    /**
+     * Plain text of the visible page, for the assistant.
+     *
+     * Readability output is used when available so navigation and boilerplate
+     * are stripped, with a raw `innerText` fallback for pages it cannot parse.
+     */
+    fun pageText(callback: (String) -> Unit) {
+        val w = activeWebView() ?: return callback("")
+        w.evaluateJavascript(
+            """(function(){
+                var doc = document.cloneNode(true);
+                var junk = doc.querySelectorAll('script,style,nav,header,footer,aside,form,noscript');
+                for (var i = 0; i < junk.length; i++) junk[i].remove();
+                var main = doc.querySelector('article,main,[role=main]') || doc.body;
+                return main ? main.innerText.replace(/\n{3,}/g, '\n\n').trim() : '';
+            })();""",
+        ) { raw ->
+            val text = runCatching {
+                org.json.JSONTokener(raw).nextValue() as? String
+            }.getOrNull().orEmpty()
+            callback(text)
+        }
+    }
+
     fun extractReader(callback: (ReaderData?) -> Unit) {
         val w = activeWebView()
         if (w == null) {

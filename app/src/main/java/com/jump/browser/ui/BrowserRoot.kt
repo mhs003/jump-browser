@@ -21,6 +21,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -134,6 +135,8 @@ fun BrowserRoot(
     var helpDialog by remember { mutableStateOf(false) }
     var siteInfoDialog by remember { mutableStateOf(false) }
     var toolsDialog by remember { mutableStateOf(false) }
+    var aiDialog by remember { mutableStateOf(false) }
+    var aiAnswer by remember { mutableStateOf("") }
     var exitDialog by remember { mutableStateOf(false) }
     var editingBookmark by remember { mutableStateOf<com.jump.browser.data.Bookmark?>(null) }
     var homeDip by remember { mutableStateOf(false) }
@@ -794,6 +797,21 @@ fun BrowserRoot(
             }
         }
 
+        if (aiDialog) {
+            JumpAlertDialog(
+                onDismissRequest = { aiDialog = false },
+                title = { Text("AI summary") },
+                text = {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Column(
+                            Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                        ) { Text(aiAnswer, fontSize = 14.sp) }
+                    }
+                },
+                confirmButton = { JumpDialogButton(onClick = { aiDialog = false }) { Text("Close") } },
+            )
+        }
+
         controller.pendingLogin?.let { pending ->
             JumpAlertDialog(
                 onDismissRequest = { controller.dismissPendingLogin() },
@@ -1024,6 +1042,25 @@ fun BrowserRoot(
 
     if (toolsDialog) {
         ToolsDialog(
+            onAskAi = {
+                toolsDialog = false
+                aiAnswer = "Thinking\u2026"
+                aiDialog = true
+                controller.pageText { text ->
+                    scope.launch {
+                        val client = com.jump.browser.data.AiClient(container.settings.settings.ai)
+                        val result = client.ask(
+                            prompt = "Summarize this page in a short paragraph, then list its " +
+                                "key points as bullets.",
+                            pageContext = text.take(12_000),
+                        )
+                        aiAnswer = when (result) {
+                            is com.jump.browser.data.AiClient.Result.Ok -> result.text
+                            is com.jump.browser.data.AiClient.Result.Error -> "Could not answer: ${result.message}"
+                        }
+                    }
+                }
+            },
             onDismiss = { toolsDialog = false },
             onReader = {
                 toolsDialog = false
@@ -1514,6 +1551,7 @@ private fun ToolsDialog(
     onTranslate: () -> Unit,
     onPageInfo: () -> Unit,
     onFind: () -> Unit,
+    onAskAi: () -> Unit,
 ) {
     JumpAlertDialog(
         onDismissRequest = onDismiss,
@@ -1526,6 +1564,7 @@ private fun ToolsDialog(
                 ToolRow(ReferenceIcons.Translate, "Translate", onTranslate)
                 ToolRow(JumpIcons.Printer, "Print", onPrint)
                 ToolRow(JumpIcons.Info, "Page info", onPageInfo)
+                ToolRow(JumpIcons.Reader, "Ask AI about this page", onAskAi)
             }
         },
         confirmButton = { JumpDialogButton(onClick = onDismiss) { Text("Close") } },

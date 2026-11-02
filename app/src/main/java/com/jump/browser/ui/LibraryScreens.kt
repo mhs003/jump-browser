@@ -856,7 +856,17 @@ fun SettingsScreen(
                             else -> settings.ai.model.ifBlank { "Endpoint set" }
                         },
                     ) { dialog = "ai" } }
-                    item { SettingsLabelRow("Orientation", "System") { toast("Orientation follows the system") } }
+                    item {
+                        SettingsLabelRow(
+                            "Orientation",
+                            when (settings.orientation) {
+                                "portrait" -> "Portrait"
+                                "landscape" -> "Landscape"
+                                "sensor" -> "Auto-rotate"
+                                else -> null
+                            },
+                        ) { dialog = "orientation" }
+                    }
                     item { SettingsLabelRow("Download location") { toast("Public Downloads folder") } }
                     item { SettingsLabelRow("Download manager") { toast("Android DownloadManager") } }
                     item { SettingsLabelRow("External video player") { toast("Videos open in the system player") } }
@@ -1312,6 +1322,49 @@ fun SettingsScreen(
                             )
                         }
                         dialog = null
+                    }
+                }
+            },
+            confirmButton = {},
+        )
+    }
+    if (dialog == "orientation") {
+        val options = listOf(
+            "system" to "Follow system",
+            "portrait" to "Portrait",
+            "landscape" to "Landscape",
+            "sensor" to "Auto-rotate",
+        )
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Orientation") },
+            text = {
+                Column {
+                    options.forEach { (value, label) ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .pressable {
+                                    onSettingsChange { it.copy(orientation = value) }
+                                    dialog = null
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                label,
+                                fontSize = 15.sp,
+                                color = if (settings.orientation == value) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onBackground
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (settings.orientation == value) {
+                                Text("\u2713", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
                 }
             },

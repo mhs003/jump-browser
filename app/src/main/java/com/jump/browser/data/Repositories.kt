@@ -36,6 +36,7 @@ class SettingsRepository(private val context: Context) {
                 nightMode = o.optBoolean("nightMode", defaults.nightMode),
                 savePasswords = o.optBoolean("savePasswords", defaults.savePasswords),
                 ai = ChatSettings.fromJson(o),
+                orientation = o.optString("orientation", defaults.orientation),
                 fullscreen = o.optBoolean("fullscreen", defaults.fullscreen),
                 customHomeCss = o.optString("customHomeCss", defaults.customHomeCss),
                 homepageLogoPath = o.optString("homepageLogoPath", defaults.homepageLogoPath),
@@ -130,6 +131,7 @@ class SettingsRepository(private val context: Context) {
             .put("incognitoDefault", s.incognitoDefault)
             .put("confirmExit", s.confirmExit)
         ChatSettings.writeTo(o, s.ai)
+        o.put("orientation", s.orientation)
         return o
     }
 
