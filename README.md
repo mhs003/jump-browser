@@ -101,6 +101,8 @@ tad install
 Debug builds are written to `app/build/outputs/apk/debug/app-debug.apk`.
 Minified release builds are written to `app/build/outputs/apk/release/app-release.apk`.
 
+Every push to `master` and every pull request runs
+`.github/workflows/ci.yml` (unit tests plus a debug APK artifact).
 Release builds are published as GitHub Releases by
 `.github/workflows/release.yml`: pushing a tag such as `v1.1.0` runs the unit
 tests, checks that `version.properties` and `CHANGELOG.md` agree, builds a

@@ -22,6 +22,8 @@ jobs:
     name: Build and publish APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      KEYSTORE_SECRET: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +43,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify version and changelog agree
+      - name: Check version against changelog
         env:
           TAG_VERSION: ${{ steps.tag.outputs.version }}
         run: |
@@ -49,7 +51,8 @@ jobs:
           file_version="$(sed -n 's/^version=//p' version.properties | tr -d '\r')"
           code="$(sed -n 's/^versionCode=//p' version.properties | tr -d '\r')"
           if [ -z "$file_version" ] || [ -z "$code" ]; then
-            echo "::error::version.properties must define version and versionCode"; exit 1
+            echo "::error::version.properties must define version and versionCode"
+            exit 1
           fi
           if [ "$file_version" != "$TAG_VERSION" ]; then
             echo "::error::Tag is v$TAG_VERSION but version.properties says $file_version"
@@ -75,27 +78,32 @@ jobs:
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
-      - name: Restore release keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+      - name: Configure release signing
         env:
-          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          cat > keystore.properties <<EOF
-          storeFile=$RUNNER_TEMP/release.jks
-          storePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
-          keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
-          EOF
+          set -euo pipefail
+          if [ -z "${KEYSTORE_SECRET:-}" ]; then
+            echo "::warning::RELEASE_KEYSTORE_BASE64 is not set; signing with the debug key."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_SECRET" | base64 -d > "$RUNNER_TEMP/release.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > keystore.properties
 
-      - name: Build signed release
+      - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Verify artifact
+      - name: Package artifact
         id: artifact
         env:
           VERSION: ${{ steps.tag.outputs.version }}
-          HAS_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
         run: |
           set -euo pipefail
           apk="app/build/outputs/apk/release/app-release.apk"
@@ -104,15 +112,13 @@ jobs:
           cp "$apk" "dist/Jump-$VERSION.apk"
           (cd dist && sha256sum "Jump-$VERSION.apk" > SHA256SUMS.txt)
           cat dist/SHA256SUMS.txt
-          if [ "${HAS_KEYSTORE:-}" != "true" ]; then
-            echo "::warning::No release keystore secrets configured; the APK is signed with the debug key and is not store-ready."
-          fi
           echo "apk=dist/Jump-$VERSION.apk" >> "$GITHUB_OUTPUT"
 
       - name: Compose release notes
         env:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
+          set -euo pipefail
           {
             echo "**Jump $VERSION**"
             echo
@@ -120,7 +126,7 @@ jobs:
             echo
             echo "### Install"
             echo
-            echo "Download \`Jump-$VERSION.apk\` below and verify it with the attached \`SHA256SUMS.txt\`."
+            echo "Download \`Jump-$VERSION.apk\` and verify it against the attached \`SHA256SUMS.txt\`."
             echo "Requires Android 8.0 (API 26) or newer."
           } > dist/RELEASE_NOTES.md
           cat dist/RELEASE_NOTES.md
@@ -132,8 +138,7 @@ jobs:
           name: Jump ${{ steps.tag.outputs.version }}
           body_path: dist/RELEASE_NOTES.md
           draft: false
-          prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
-          generate_release_notes: true
+          generate_release_notes: false
           files: |
             ${{ steps.artifact.outputs.apk }}
             dist/SHA256SUMS.txt
