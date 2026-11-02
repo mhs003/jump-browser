@@ -9,6 +9,8 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility as AnimVis
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -52,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +88,7 @@ import com.jump.browser.ui.theme.JumpScrim
 import com.jump.browser.ui.theme.Surface
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import kotlinx.coroutines.withContext
 
 private enum class LibraryPage { NONE, RECORDS, DOWNLOADS, SETTINGS, SNIFFER, NETWORK, SAVED }
 
@@ -137,6 +141,50 @@ fun BrowserRoot(
     var immersive by remember { mutableStateOf(false) }
     var lastBack by remember { mutableLongStateOf(0L) }
     val rootView = LocalView.current
+
+    // Bookmark import/export through the system file pickers, so files come
+    // from and go to wherever the user keeps them (including Downloads).
+    var pendingExport by remember { mutableStateOf<String?>(null) }
+    var importCallback by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/html"),
+    ) { uri ->
+        val html = pendingExport
+        pendingExport = null
+        if (uri == null || html == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val written = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(html.toByteArray())
+                    }
+                }.isSuccess
+            }
+            JumpToast.show(context, if (written) "Bookmarks exported" else "Could not write the file")
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val done = importCallback
+        importCallback = null
+        if (uri == null) {
+            done?.invoke(0)
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            val added = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    container.bookmarks.importHtml(text)
+                }.getOrDefault(0)
+            }
+            done?.invoke(added)
+        }
+    }
 
     // Web pages are darkened by "Night mode", independently of the chrome
     // theme. When the chrome follows the system, the page follows suit.
@@ -772,6 +820,16 @@ fun BrowserRoot(
                     LibraryPage.SETTINGS -> SettingsScreen(
                         settings = settings,
                         onBack = { page = LibraryPage.NONE },
+                        onExportBookmarks = { html ->
+                            pendingExport = html
+                            runCatching {
+                                exportLauncher.launch("bookmarks.html")
+                            }
+                        },
+                        onImportBookmarks = { done ->
+                            importCallback = done
+                            runCatching { importLauncher.launch(arrayOf("text/html", "text/plain", "*/*")) }
+                        },
                         onSettingsChange = { transform ->
                             container.settings.update(transform)
                             controller.applySettingsToAll()

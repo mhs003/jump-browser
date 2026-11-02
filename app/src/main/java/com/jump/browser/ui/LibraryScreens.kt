@@ -753,6 +753,8 @@ fun SettingsScreen(
     onSettingsChange: ((AppSettings) -> AppSettings) -> Unit,
     onClearData: () -> Unit,
     onAbout: () -> Unit,
+    onExportBookmarks: (String) -> Unit = {},
+    onImportBookmarks: (onDone: (Int) -> Unit) -> Unit = { it(0) },
 ) {
     val context = LocalContext.current
     var category by remember { mutableStateOf<String?>(null) }
@@ -836,7 +838,12 @@ fun SettingsScreen(
                     item { SettingsLabelRow("Clear data on exit", "Off") { toast("Browsing data is kept on exit") } }
                     item { SettingsLabelRow("Font", if (settings.textZoom == 100) null else "${settings.textZoom}%") { dialog = "zoom" } }
                     item { SettingsLabelRow("Gestures") { toast("Gesture settings are not available") } }
-                    item { SettingsLabelRow("Import/export bookmarks") { toast("Bookmark folders are not available") } }
+                    item {
+                        SettingsLabelRow("Import bookmarks") { dialog = "importBookmarks" }
+                    }
+                    item {
+                        SettingsLabelRow("Export bookmarks") { dialog = "exportBookmarks" }
+                    }
                     item { SettingsLabelRow("Import data") { toast("Nothing to import") } }
                     item { SettingsLabelRow("Export data") { toast("Nothing to export") } }
                     item { SettingsLabelRow("Restore tabs on startup", if (settings.restoreTabs) null else "Off") {
@@ -1212,6 +1219,61 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
+        )
+    }
+    if (dialog == "importBookmarks") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Import bookmarks") },
+            text = {
+                Text(
+                    "Choose a bookmarks.html file exported from another browser. " +
+                        "Folders are kept and bookmarks you already have are skipped.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    dialog = null
+                    onImportBookmarks { count ->
+                        toast(
+                            if (count > 0) "Imported $count bookmark${if (count == 1) "" else "s"}"
+                            else "No new bookmarks found",
+                        )
+                    }
+                }) { Text("Choose file") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+    if (dialog == "exportBookmarks") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Export bookmarks") },
+            text = {
+                Text(
+                    "Saves a bookmarks.html file that other browsers can import.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    val chooser = android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                        type = "text/html"
+                        putExtra(android.content.Intent.EXTRA_TITLE, "bookmarks.html")
+                    }
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent.createChooser(chooser, "Export bookmarks"),
+                        )
+                    }
+                    dialog = null
+                }) { Text("Export") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "backgroundOpacity") {

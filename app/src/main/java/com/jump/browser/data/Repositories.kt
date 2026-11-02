@@ -175,18 +175,65 @@ class BookmarkRepository(
 
     fun isBookmarked(url: String) = bookmarks.any { it.url == url }
 
+    /** Every distinct folder name currently in use, in first-seen order. */
+    fun folders(): List<String> =
+        bookmarks.map { it.folder.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
+
+    fun inFolder(folder: String): List<Bookmark> =
+        if (folder.isBlank()) bookmarks.filter { it.folder.isBlank() }
+        else bookmarks.filter { it.folder == folder }
+
+    /** Netscape bookmark file: the format every other browser can import. */
     fun exportHtml(): String {
-        val rows = bookmarks.joinToString("\n") {
-            """        <DT><A HREF="${it.url.replace("\"", "&quot;")}" ADD_DATE="${it.createdAt / 1000}">${it.title.replace("<", "&lt;").replace("&", "&amp;")}</A>"""
+        fun escape(value: String) = value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+
+        fun entry(b: Bookmark) =
+            """        <DT><A HREF="${escape(b.url)}" ADD_DATE="${b.createdAt / 1000}">${escape(b.title)}</A>"""
+
+        val loose = bookmarks.filter { it.folder.isBlank() }.joinToString("\n", transform = ::entry)
+        val foldersHtml = folders().joinToString("\n") { folder ->
+            val items = inFolder(folder).joinToString("\n", transform = ::entry)
+            "    <DT><H3>${escape(folder)}</H3>\n" +
+                "    <DL><p>\n" + items + "\n    </DL><p>"
         }
         return """<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
 <TITLE>Bookmarks</TITLE>
 <H1>Bookmarks</H1>
 <DL><p>
-$rows
+$loose
+$foldersHtml
 </DL><p>
 """
+    }
+
+    /**
+     * Parses a Netscape bookmark file and merges it in.
+     *
+     * Duplicate URLs are skipped, matching what browsers do on import.
+     * Returns how many bookmarks were added.
+     */
+    fun importHtml(html: String): Int {
+        val parsed = NetscapeBookmarks.parse(html, idGen::incrementAndGet)
+        var count = 0
+        synchronized(this) {
+            val existing = bookmarks.map { it.url }.toMutableSet()
+            val fresh = parsed.filter { existing.add(it.url) }
+            if (fresh.isNotEmpty()) bookmarks = bookmarks + fresh
+            count = fresh.size
+        }
+        if (count > 0) persist()
+        return count
+    }
+
+    /** Replaces the stored list, used by import with "replace" semantics. */
+    fun replaceAll(items: List<Bookmark>) {
+        synchronized(this) { bookmarks = items }
+        persist()
     }
 
     private fun persist() {
