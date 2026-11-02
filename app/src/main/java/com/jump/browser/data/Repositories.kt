@@ -34,6 +34,7 @@ class SettingsRepository(private val context: Context) {
             AppSettings(
                 searchEngineId = o.optString("searchEngineId", defaults.searchEngineId),
                 nightMode = o.optBoolean("nightMode", defaults.nightMode),
+                savePasswords = o.optBoolean("savePasswords", defaults.savePasswords),
                 fullscreen = o.optBoolean("fullscreen", defaults.fullscreen),
                 customHomeCss = o.optString("customHomeCss", defaults.customHomeCss),
                 homepageLogoPath = o.optString("homepageLogoPath", defaults.homepageLogoPath),
@@ -79,6 +80,7 @@ class SettingsRepository(private val context: Context) {
         val o = JSONObject()
             .put("searchEngineId", s.searchEngineId)
             .put("nightMode", s.nightMode)
+            .put("savePasswords", s.savePasswords)
             .put("fullscreen", s.fullscreen)
             .put("customHomeCss", s.customHomeCss)
             .put("homepageLogoPath", s.homepageLogoPath)
@@ -604,5 +606,6 @@ class AppContainer(context: Context) {
     val downloads: DownloadRepository by lazy { DownloadRepository(context, scope) }
     val tabs: TabStore by lazy { TabStore(context) }
     val scripts: ScriptRepository by lazy { ScriptRepository(context, scope) }
+    val passwords: PasswordRepository by lazy { PasswordRepository(context, scope) }
     val filesDir: File = context.filesDir
 }

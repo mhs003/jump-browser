@@ -157,6 +157,8 @@ data class AppSettings(
     val incognitoDefault: Boolean = false,
     val confirmExit: Boolean = true,
     val nightMode: Boolean = false,
+    /** Save logins locally and offer to fill them. */
+    val savePasswords: Boolean = false,
     val fullscreen: Boolean = false,
     val customHomeCss: String = "",
     val homepageLogoPath: String = "",

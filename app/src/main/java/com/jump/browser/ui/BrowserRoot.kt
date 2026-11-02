@@ -763,6 +763,41 @@ fun BrowserRoot(
             }
         }
 
+        controller.pendingLogin?.let { pending ->
+            JumpAlertDialog(
+                onDismissRequest = { controller.dismissPendingLogin() },
+                title = { Text("Save password?") },
+                text = {
+                    Column {
+                        Text(
+                            "Jump can remember this login for ${pending.host}.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(pending.username, fontSize = 16.sp)
+                        Text(
+                            "\u2022".repeat(pending.password.length.coerceAtMost(12)),
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Encrypted with this device's keystore. Not synced anywhere.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                confirmButton = {
+                    JumpDialogButton(onClick = { controller.acceptPendingLogin() }) { Text("Save") }
+                },
+                dismissButton = {
+                    JumpDialogButton(onClick = { controller.dismissPendingLogin() }) { Text("Not now") }
+                },
+            )
+        }
+
         if (shownPage != LibraryPage.NONE) {
             Surface(
                 modifier = Modifier
@@ -826,6 +861,9 @@ fun BrowserRoot(
                                 exportLauncher.launch("bookmarks.html")
                             }
                         },
+                        logins = container.passwords.logins,
+                        onRemoveLogin = { container.passwords.remove(it) },
+                        onClearLogins = { container.passwords.clear() },
                         scripts = container.scripts.scripts,
                         onAddScript = { source ->
                             val script = container.scripts.add(source)

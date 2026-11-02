@@ -759,6 +759,9 @@ fun SettingsScreen(
     onAddScript: (String) -> Unit = {},
     onRemoveScript: (Long) -> Unit = {},
     onToggleScript: (Long, Boolean) -> Unit = { _, _ -> },
+    logins: List<com.jump.browser.data.SavedLogin> = emptyList(),
+    onRemoveLogin: (Long) -> Unit = {},
+    onClearLogins: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var category by remember { mutableStateOf<String?>(null) }
@@ -809,7 +812,17 @@ fun SettingsScreen(
                         onSettingsChange { it.copy(adBlock = !it.adBlock) }
                     } }
                     item { SettingsLabelRow("Site configuration", exceptionsSummary()) { toast("Saved site exceptions: ${exceptionsSummary()}") } }
-                    item { SettingsLabelRow("Password manager") { toast("No saved passwords") } }
+                    item { SettingsLabelRow(
+                        "Save passwords",
+                        if (settings.savePasswords) "On" else "Off",
+                    ) {
+                        onSettingsChange { it.copy(savePasswords = !it.savePasswords) }
+                    } }
+                    item { SettingsLabelRow(
+                        "Password manager",
+                        if (logins.isEmpty()) "No saved passwords"
+                        else "${logins.size} saved",
+                    ) { dialog = "passwords" } }
                     item { SettingsLabelRow("Night mode", if (settings.nightMode) "On" else null) {
                         onSettingsChange { it.copy(nightMode = !it.nightMode) }
                     } }
@@ -1295,6 +1308,63 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
+        )
+    }
+    if (dialog == "passwords") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Saved passwords") },
+            text = {
+                if (logins.isEmpty()) {
+                    Text(
+                        "No passwords saved. Turn on \"Save passwords\" and Jump will offer " +
+                            "to remember logins for the sites you sign in to.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                        Text(
+                            "Stored on this device, encrypted with the system keystore.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        logins.forEach { login ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(login.host, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    Text(
+                                        login.username,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                com.jump.browser.ui.theme.TextButton(onClick = { onRemoveLogin(login.id) }) {
+                                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (logins.isNotEmpty()) {
+                    JumpDialogButton(onClick = { onClearLogins(); dialog = null }) {
+                        Text("Remove all")
+                    }
+                } else {
+                    JumpDialogButton(onClick = { dialog = null }) { Text("Close") }
+                }
+            },
+            dismissButton = {
+                if (logins.isNotEmpty()) {
+                    JumpDialogButton(onClick = { dialog = null }) { Text("Close") }
+                }
+            },
         )
     }
     if (dialog == "importBookmarks") {

@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import com.jump.browser.data.LoginAutofill
 import com.jump.browser.ui.JumpToast
 import com.jump.browser.data.AppContainer
 import com.jump.browser.data.TabSnapshot
@@ -817,6 +818,74 @@ class BrowserController(
      * so its errors surface in the WebView console instead of silently
      * stopping the injection.
      */
+    /** Host of the page that most recently finished loading, for autofill. */
+    private var lastHost: String? = null
+
+    /** Set when the current page contains a password field. */
+    private var wasPasswordPage = false
+
+    /** A submitted login waiting for the user to accept saving it. */
+    var pendingLogin by mutableStateOf<PendingLogin?>(null)
+        private set
+
+    data class PendingLogin(val host: String, val username: String, val password: String)
+
+    fun dismissPendingLogin() {
+        pendingLogin = null
+    }
+
+    fun acceptPendingLogin() {
+        val login = pendingLogin ?: return
+        pendingLogin = null
+        app.passwords.save(login.host, login.username, login.password)
+        notify("Password saved")
+    }
+
+    private fun captureCandidate(raw: String?, sourceUrl: String) {
+        if (!app.settings.settings.savePasswords) return
+        val host = UrlUtils.host(sourceUrl)
+        if (host.isBlank()) return
+        val text = raw?.let { decoded ->
+            runCatching { org.json.JSONTokener(decoded).nextValue() as? String }.getOrNull()
+        } ?: return
+        val json = runCatching { org.json.JSONObject(text) }.getOrNull() ?: return
+        val user = json.optString("u").trim()
+        val pass = json.optString("p")
+        if (user.isBlank() || pass.isBlank()) return
+        // Do not offer a login that is already stored unchanged.
+        val existing = app.passwords.forHost(host).firstOrNull { it.username == user }
+        if (existing != null && existing.password == pass) return
+        pendingLogin = PendingLogin(host, user, pass)
+    }
+
+    /** Called by the UI when the user accepts saving a login. */
+    fun saveLogin(host: String, username: String, password: String) {
+        app.passwords.save(host, username, password)
+    }
+
+    /**
+     * Offers to fill a saved login after a page loads.
+     *
+     * Autofill is deliberately conservative: it only fills logins the user
+     * already chose to save for that exact host, and only when a password
+     * field is present and empty.
+     */
+    private fun autofillIfPossible(view: WebView, url: String) {
+        val host = UrlUtils.host(url)
+        lastHost = host
+        val logins = app.passwords.forHost(host)
+        if (logins.isEmpty()) return
+        val login = logins.first()
+        view.evaluateJavascript(
+            "(function(){var p=document.querySelector('input[type=password]');" +
+                "return !!(p && !p.value);})()",
+        ) { result ->
+            if (result == "true") {
+                view.evaluateJavascript(LoginAutofill.script(login.username, login.password), null)
+            }
+        }
+    }
+
     fun injectUserScripts(view: WebView, url: String?) {
         if (url == null || !url.startsWith("http")) return
         val scripts = runCatching { app.scripts.forUrl(url) }.getOrDefault(emptyList())
@@ -948,6 +1017,13 @@ class BrowserController(
             super.onPageStarted(view, url, favicon)
             view?.let(::syncColorScheme)
             // document-start scripts have to be in before parsing continues.
+            // Remember credentials the user submitted on the page they are
+            // leaving, so they can be offered for saving after the redirect.
+            if (view != null && url != null && wasPasswordPage) {
+                view.evaluateJavascript(LoginAutofill.captureScript) { raw ->
+                    captureCandidate(raw, url)
+                }
+            }
             if (view != null && url != null) {
                 val early = runCatching { app.scripts.forUrl(url) }.getOrDefault(emptyList())
                     .filter { it.runAtStart }
@@ -991,7 +1067,13 @@ class BrowserController(
             }
 
             syncColorScheme(view)
+            if (app.settings.settings.savePasswords) {
+                view.evaluateJavascript(
+                    "!!document.querySelector('input[type=password]')",
+                ) { result -> wasPasswordPage = result == "true" }
+            }
             injectUserScripts(view, url)
+            if (app.settings.settings.savePasswords) autofillIfPossible(view, url)
             if (app.settings.settings.doNotTrack) {
                 view.evaluateJavascript(
                     "Object.defineProperty(navigator,'doNotTrack',{get:function(){return '1';},configurable:true});" +
