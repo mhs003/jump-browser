@@ -164,18 +164,22 @@ Motion is part of the product, not decoration.
 |---|---|---|
 | Address bar and suggestions | 240ms fade | 240ms fade |
 | Menu scrim | 160ms fade, 20% dim | 160ms fade |
-| Menu sheet | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
+| Menu sheet | 180ms window slide up from the bottom edge | 180ms window slide down |
 | Tab popup scrim | 160ms fade, 25% dim | 160ms fade |
-| Tab popup panel | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
+| Tab popup panel | 180ms window slide up from the bottom edge | 180ms window slide down |
 | Library/settings page enter | 220ms: new page from 100% right, old page to −30% left | — |
 | Library/settings page back | 220ms: previous page from −30% left, current page to 100% right | — |
 | Interactive page swipe | Page follows finger; 46% threshold | 300ms settle if released early |
-| Dialog enter | 240ms bounce, 90%→100% scale + 20dp rise + fade | 120ms fade |
+| Dialog / popup / site info | 240ms: fade, 10% rise, 0.9→1.0 bottom scale, platform bounce interpolator | same animation reversed |
+| Sheet scrim | 150ms fade | 150ms fade |
 | Toast | 180ms fade + 20dp rise | 180ms fade + 20dp fall |
 | Context menu | 100ms fade | 100ms fade |
 
-Movement uses an accelerating curve for bottom sheets and popups, matching the
-reference window animations. Settings and library pages use the reference
+Floating surfaces (menu sheet, tab list, title popup, site info, dialogs) are
+real windows and animate with platform window animations defined in
+`res/anim` and `res/values/styles.xml`; Compose transitions are not used for
+them because they cannot play an exit once the owning boolean flips. Each
+surface has its own scrim window so the dim and the surface move together. Settings and library pages use the reference
 accelerate/decelerate 220ms fragment transition, including an interactive
 left-to-right back gesture with the current page tracking the finger. Page
 indicator and menu paging use the horizontal pager's own spring. The homepage

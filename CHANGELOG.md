@@ -10,6 +10,19 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- Floating surfaces now animate with real platform window animations
+  instead of Compose transitions that could never play their exit:
+  - the menu sheet and tab list slide up from the bottom edge (180ms);
+  - the title Copy / Paste / Paste & Go popup and site info use the
+    reference popup animation (fade, 10% rise, 0.9→1.0 scale, 240ms,
+    platform bounce interpolator);
+  - every dialog was calling `setWindowAnimations(0)`, so dialogs now use
+    that same popup animation;
+  - each surface has a separate scrim window that fades in 150ms without
+    sliding, so the dim moves with the surface.
+
 ### Changed
 
 - `dist/` is no longer committed; APKs are published through GitHub Releases.
