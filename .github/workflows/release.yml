@@ -127,6 +127,12 @@ jobs:
       - name: Report build failure
         if: failure()
         run: |
+          # Annotations are visible without signing in, unlike the job log, so
+          # echo the first real Gradle failure line there too.
+          line="$(grep -m1 -E '^e: |What went wrong|Caused by|> Task .* FAILED|Could not (resolve|download|install)' "$RUNNER_TEMP/build.log" || true)"
+          if [ -n "$line" ]; then
+            echo "::error title=Gradle failure::$line"
+          fi
           {
             echo "## Release build failed"
             echo '```'
