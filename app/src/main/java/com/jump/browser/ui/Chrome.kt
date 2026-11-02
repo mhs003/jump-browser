@@ -55,7 +55,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,7 +81,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -561,12 +559,10 @@ fun MenuOverlay(
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
-    // A real window, but the sheet animates itself with the reference's
-    // 180ms curve (see SheetAnimation.kt); window animations follow
-    // window_animation_scale and would snap to their end on this device.
+    // A real window so the sheet floats above the chrome. It only fades: the
+    // window animation is disabled because it follows window_animation_scale.
     SheetWindow(onDismiss = onDismiss) {
         val progress by rememberSheetProgress(visible)
-        val sheetHeight = remember { mutableFloatStateOf(0f) }
         Box(
             Modifier
                 .fillMaxSize()
@@ -581,8 +577,7 @@ fun MenuOverlay(
                 Modifier
                     .padding(horizontal = 1.dp)
                     .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
-                    .onSizeChanged { sheetHeight.floatValue = it.height.toFloat() }
-                    .sheetSlide(progress, sheetHeight.floatValue),
+                    .overlayFade(progress),
             ) {
                 MenuSheetContent(
                     tab = tab,
@@ -752,10 +747,9 @@ fun TabPopup(
     bottomInset: Int,
 ) {
     if (!visible) return
-    // Same window + self-animated slide as the menu sheet.
+    // Same window and fade as the menu sheet.
     SheetWindow(onDismiss = onDismiss) {
         val progress by rememberSheetProgress(visible)
-        val sheetHeight = remember { mutableFloatStateOf(0f) }
         Box(
             Modifier
                 .fillMaxSize()
@@ -767,11 +761,7 @@ fun TabPopup(
                 ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Box(
-                Modifier
-                    .onSizeChanged { sheetHeight.floatValue = it.height.toFloat() }
-                    .sheetSlide(progress, sheetHeight.floatValue),
-            ) {
+            Box(Modifier.overlayFade(progress)) {
                 Surface(
                     Modifier
                         .fillMaxWidth()

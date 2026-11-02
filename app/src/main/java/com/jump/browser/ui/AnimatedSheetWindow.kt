@@ -12,12 +12,10 @@ import androidx.compose.ui.window.DialogWindowProvider
 /**
  * A transparent full-screen window that hosts a bottom sheet.
  *
- * The sheet lives in a real window so it floats above the browser chrome, but
- * it deliberately does **not** use a platform window animation: those follow
- * `window_animation_scale`, which many devices keep at 0.1, so the sheet would
- * appear to jump instead of slide. The window is made transparent here and the
- * sheet runs the reference's own 180ms curve in composition
- * (see [rememberSheetProgress]).
+ * The sheet lives in a real window so it floats above the browser chrome. The
+ * window itself does not animate: platform window animations follow
+ * `window_animation_scale`, which many devices keep near zero. The sheet only
+ * fades, driven in composition by [rememberSheetProgress].
  */
 @Composable
 fun SheetWindow(
@@ -37,8 +35,7 @@ fun SheetWindow(
         val window = (view.parent as? DialogWindowProvider)?.window
         LaunchedEffect(window) {
             val w = window ?: return@LaunchedEffect
-            // Transparent window: the sheet draws its own scrim, and the
-            // platform animation must not compress the slide.
+            // Transparent window: the sheet draws its own scrim and fade.
             w.setDimAmount(0f)
             w.setWindowAnimations(0)
             w.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))

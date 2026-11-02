@@ -2,17 +2,12 @@
 <resources>
     <!--
         Window animation styles for the floating surfaces. `windowAnimations`
-        takes a *style* that names the enter and exit animations, so each
-        animation pair from res/anim gets a style here.
+        takes a *style* that names the enter and exit animations. Every style
+        is a plain fade; sheets fade in composition instead (SheetAnimation.kt).
     -->
     <style name="Animation.Jump.Popup" parent="@android:style/Animation.Dialog">
         <item name="android:windowEnterAnimation">@anim/jump_popup_in</item>
         <item name="android:windowExitAnimation">@anim/jump_popup_out</item>
-    </style>
-
-    <style name="Animation.Jump.Sheet" parent="@android:style/Animation.Dialog">
-        <item name="android:windowEnterAnimation">@anim/jump_sheet_in</item>
-        <item name="android:windowExitAnimation">@anim/jump_sheet_out</item>
     </style>
 
     <style name="Animation.Jump.Scrim" parent="@android:style/Animation.Dialog">

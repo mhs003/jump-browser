@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +68,9 @@ fun TopAnchoredPopup(
             dismissOnClickOutside = false,
         ),
     ) {
-        JumpDialogWindow(JumpWindowAnimation.POPUP)
+        // Fade only, like the sheets: no slide or scale.
+        JumpDialogWindow(JumpWindowAnimation.NONE)
+        val progress by rememberSheetProgress(visible = true)
         Box(
             Modifier
                 .fillMaxSize()
@@ -81,7 +84,8 @@ fun TopAnchoredPopup(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .padding(top = 48.dp),
+                        .padding(top = 48.dp)
+                        .overlayFade(progress),
                     contentAlignment = contentAlignment,
                 ) {
                     content()

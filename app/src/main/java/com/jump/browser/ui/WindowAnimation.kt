@@ -16,14 +16,14 @@ import com.jump.browser.R
  * style names the enter and exit animation from `res/anim`.
  */
 enum class JumpWindowAnimation(val style: Int) {
-    /** Scale/rise popup used by menus, dialogs and the title popup. */
+    /** Plain fade used by dialogs. */
     POPUP(R.style.Animation_Jump_Popup),
 
-    /** Slide from the bottom edge used by the menu sheet and tab list. */
-    SHEET(R.style.Animation_Jump_Sheet),
-
-    /** The sheet's dim layer: a 150ms fade with no movement. */
+    /** A plain fade for scrim layers. */
     SCRIM(R.style.Animation_Jump_Scrim),
+
+    /** No window animation: the surface animates itself in composition. */
+    NONE(0),
 }
 
 /**
