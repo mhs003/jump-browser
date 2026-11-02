@@ -158,35 +158,29 @@ and 16sp action bar labels.
 
 ## Motion
 
-Motion is part of the product, not decoration. Curves and durations come from
-the reference APK resources and are implemented once in `ui/ReferenceMotion.kt`.
+Motion is part of the product, not decoration.
 
 | Transition | Enter | Exit |
 |---|---|---|
 | Address bar and suggestions | 240ms fade | 240ms fade |
-| Menu scrim | 180ms fade to 20% dim, same progress as the sheet | 180ms fade |
-| Menu sheet | 180ms slide from its own height below the footer, `PathInterpolator(0.2, 0.2, 0.8, 0.8)` | same curve in reverse |
-| Tab popup scrim | 180ms fade to 25% dim | 180ms fade |
-| Tab popup panel | 180ms slide from its own height, same curve | same curve in reverse |
+| Menu scrim | 160ms fade, 20% dim | 160ms fade |
+| Menu sheet | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
+| Tab popup scrim | 160ms fade, 25% dim | 160ms fade |
+| Tab popup panel | 160ms slide-up (60dp) + fade | 160ms slide-down + fade |
 | Library/settings page enter | 220ms: new page from 100% right, old page to −30% left | — |
 | Library/settings page back | 220ms: previous page from −30% left, current page to 100% right | — |
 | Interactive page swipe | Page follows finger; 46% threshold | 300ms settle if released early |
-| Title popup (`@anim/a` / `@anim/b`) | 240ms: alpha 0→1, 10% rise, 0.9→1.0 scale, bottom-centre pivot, platform `BounceInterpolator` | identical animation in reverse |
-| Dialog | 240ms bounce, 90%→100% scale + rise + fade | 120ms fade |
-| Toast | 180ms fade + 20dp rise, sheet curve | 180ms fade + 20dp fall |
-| Toolbar show/hide | 160ms `accelerate`, 120px travel | 160ms `accelerate` |
+| Dialog enter | 240ms bounce, 90%→100% scale + 20dp rise + fade | 120ms fade |
+| Toast | 180ms fade + 20dp rise | 180ms fade + 20dp fall |
 | Context menu | 100ms fade | 100ms fade |
 
-Overlays that are toggled by a boolean (`OverlayVisibility`) stay composed until
-the leave animation completes, so closing animates instead of disappearing.
-The scrim of a sheet shares the panel's progress value, so the dim rises and
-falls with the panel rather than snapping on.
-
-Settings and library pages use the reference accelerate/decelerate 220ms
-fragment transition, including an interactive left-to-right back gesture with
-the current page tracking the finger. Page indicator and menu paging use the
-horizontal pager's own spring. The homepage search gesture translates content
-down by 72dp and fades it to 10% before opening the address overlay.
+Movement uses an accelerating curve for bottom sheets and popups, matching the
+reference window animations. Settings and library pages use the reference
+accelerate/decelerate 220ms fragment transition, including an interactive
+left-to-right back gesture with the current page tracking the finger. Page
+indicator and menu paging use the horizontal pager's own spring. The homepage
+search gesture translates content down by 72dp and fades it to 10% before
+opening the address overlay.
 
 ## Extension points
 

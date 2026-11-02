@@ -44,9 +44,8 @@ adb -s 127.0.0.1:5555 shell am start \
   WebView host when opening the library, menu or overlays.
 - Respect the 48dp chrome rhythm: 48dp title bar, 48dp bottom bar, 48dp rows.
 - The five-slot bottom bar is fixed: back, forward, home, tab count, menu.
-- Animations use the reference timings documented in `ARCHITECTURE.md`
-  (180ms sheet slide with `PathInterpolator(0.2, 0.2, 0.8, 0.8)`, 240ms
-  popup with the platform bounce curve, 160ms toolbar, 220ms pages).
+- Animations use the timings documented in `ARCHITECTURE.md`. Keep 220–240ms
+  for panels, 150–180ms for fades, and decelerating easing for entrance.
 - Do not introduce references to files outside this repository in code or
   documentation.
 
@@ -82,13 +81,7 @@ app/src/main/java/com/jump/browser/
 - Keep commits coherent and descriptive.
 - Release builds are minified, resource-shrunk and signed with the local debug
   key for sideloading: `tad build release`.
-- Never commit build artifacts. `dist/` is ignored; user-facing APKs are
-  attached to GitHub Releases by the release workflow.
-- Bump `version.properties` (both `version` and `versionCode`) and add a
-  matching `## [x.y.z] - YYYY-MM-DD` entry to `CHANGELOG.md` for every release
-  commit. Follow Semantic Versioning: a bug fix or visual correction is a
-  patch, a new feature a minor, a breaking data/UI change a major.
-- Motion comes from `ui/ReferenceMotion.kt`; add new curves there from the
-  reference resources instead of inlining ad-hoc spring specs.
+- Keep `dist/Jump-1.0.0.apk` and `dist/SHA256SUMS.txt` in sync with the release
+  build when producing a user-facing artifact.
 - Screenshots live in `docs/screenshots/`; README references only files inside
   this repository.
