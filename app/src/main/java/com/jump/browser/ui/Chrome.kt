@@ -55,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -81,6 +82,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -559,44 +561,16 @@ fun MenuOverlay(
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
-    // A real window, so the sheet animates with the platform's window
-    // animation. Its scrim is a second window underneath: it eases in over
-    // 150ms with no slide, so the dim travels with the sheet instead of
-    // popping on ahead of it.
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-        content = {
-            JumpDialogWindow(JumpWindowAnimation.SCRIM)
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.20f))
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                    ) { onDismiss() },
-            )
-        },
-    )
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        JumpDialogWindow(JumpWindowAnimation.SHEET)
+    // A real window, but the sheet animates itself with the reference's
+    // 180ms curve (see SheetAnimation.kt); window animations follow
+    // window_animation_scale and would snap to their end on this device.
+    SheetWindow(onDismiss = onDismiss) {
+        val progress by rememberSheetProgress(visible)
+        val sheetHeight = remember { mutableFloatStateOf(0f) }
         Box(
             Modifier
                 .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.20f * progress))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
@@ -606,7 +580,9 @@ fun MenuOverlay(
             Box(
                 Modifier
                     .padding(horizontal = 1.dp)
-                    .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() }),
+                    .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
+                    .onSizeChanged { sheetHeight.floatValue = it.height.toFloat() }
+                    .sheetSlide(progress, sheetHeight.floatValue),
             ) {
                 MenuSheetContent(
                     tab = tab,
@@ -776,48 +752,26 @@ fun TabPopup(
     bottomInset: Int,
 ) {
     if (!visible) return
-    // A real window, like the menu sheet, so both animate identically.
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        JumpDialogWindow(JumpWindowAnimation.SCRIM)
+    // Same window + self-animated slide as the menu sheet.
+    SheetWindow(onDismiss = onDismiss) {
+        val progress by rememberSheetProgress(visible)
+        val sheetHeight = remember { mutableFloatStateOf(0f) }
         Box(
             Modifier
                 .fillMaxSize()
                 .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
-                .background(Color.Black.copy(alpha = 0.25f))
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                ) { onDismiss() },
-        )
-    }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        JumpDialogWindow(JumpWindowAnimation.SHEET)
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
+                .background(Color.Black.copy(alpha = 0.25f * progress))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
+            Box(
+                Modifier
+                    .onSizeChanged { sheetHeight.floatValue = it.height.toFloat() }
+                    .sheetSlide(progress, sheetHeight.floatValue),
+            ) {
                 Surface(
                     Modifier
                         .fillMaxWidth()
@@ -868,6 +822,7 @@ fun TabPopup(
                         }
                     }
                 }
+            }
         }
     }
 }
