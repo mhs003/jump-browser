@@ -849,7 +849,13 @@ fun SettingsScreen(
                             customSearchDraft = settings.customSearchUrl; dialog = "customSearch"
                         } }
                     }
-                    item { SettingsLabelRow("AI settings") { toast("AI is not enabled") } }
+                    item { SettingsLabelRow(
+                        "AI settings",
+                        when {
+                            settings.ai.baseUrl.isBlank() -> "Not configured"
+                            else -> settings.ai.model.ifBlank { "Endpoint set" }
+                        },
+                    ) { dialog = "ai" } }
                     item { SettingsLabelRow("Orientation", "System") { toast("Orientation follows the system") } }
                     item { SettingsLabelRow("Download location") { toast("Public Downloads folder") } }
                     item { SettingsLabelRow("Download manager") { toast("Android DownloadManager") } }
@@ -1310,6 +1316,72 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
+        )
+    }
+    if (dialog == "ai") {
+        var baseUrl by remember(dialog) { mutableStateOf(settings.ai.baseUrl) }
+        var model by remember(dialog) { mutableStateOf(settings.ai.model) }
+        var key by remember(dialog) { mutableStateOf(settings.ai.apiKey) }
+        var prompt by remember(dialog) { mutableStateOf(settings.ai.systemPrompt) }
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("AI settings") },
+            text = {
+                Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                    Text(
+                        "Jump has no AI backend of its own. Point it at any service that " +
+                            "speaks the OpenAI chat API; the key is stored on this device only.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Endpoint", fontSize = 13.sp)
+                    JumpTextField(
+                        value = baseUrl,
+                        onValueChange = { baseUrl = it },
+                        placeholder = "https://api.openai.com/v1",
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("Model", fontSize = 13.sp)
+                    JumpTextField(
+                        value = model,
+                        onValueChange = { model = it },
+                        placeholder = "gpt-4o-mini",
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("API key", fontSize = 13.sp)
+                    JumpTextField(
+                        value = key,
+                        onValueChange = { key = it },
+                        placeholder = "sk-...",
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("System prompt (optional)", fontSize = 13.sp)
+                    JumpTextField(
+                        value = prompt,
+                        onValueChange = { prompt = it },
+                        placeholder = "Answer briefly.",
+                        singleLine = false,
+                        minLines = 2,
+                    )
+                }
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    onSettingsChange {
+                        it.copy(
+                            ai = com.jump.browser.data.ChatSettings(
+                                baseUrl = baseUrl.trim(),
+                                model = model.trim(),
+                                apiKey = key.trim(),
+                                systemPrompt = prompt.trim(),
+                            ),
+                        )
+                    }
+                    dialog = null
+                }) { Text("Save") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "sync") {

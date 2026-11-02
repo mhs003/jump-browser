@@ -80,11 +80,23 @@ data class UserScript(
             var runAt = "document-idle"
 
             metaBlock.find(source)?.groupValues?.getOrNull(1)?.let { block ->
-                block.lineSequence().forEach { raw ->
-                    val line = raw.trim().removePrefix("//").removePrefix("*").trim()
+                // The block is normally one directive per line, but a block
+                // pasted as a single line is accepted too: split on `@` so each
+                // directive is still read separately.
+                val directives = block.lineSequence()
+                    .flatMap { raw ->
+                        val cleaned = raw.trim().removePrefix("//").removePrefix("*").trim()
+                        if (cleaned.count { it == '@' } <= 1) sequenceOf(cleaned)
+                        else sequenceOf(cleaned).flatMap { single ->
+                            single.split(" // ").asSequence()
+                        }
+                    }
+                directives.forEach { line ->
                     val m = metaLine.find(line) ?: return@forEach
                     val key = m.groupValues[1].lowercase()
                     val value = m.groupValues[2].trim()
+                        .removeSuffix("//")
+                        .trim()
                     when (key) {
                         "name" -> if (name.isBlank()) name = value
                         "match", "include" -> matches += value

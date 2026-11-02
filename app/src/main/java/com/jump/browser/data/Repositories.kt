@@ -35,6 +35,7 @@ class SettingsRepository(private val context: Context) {
                 searchEngineId = o.optString("searchEngineId", defaults.searchEngineId),
                 nightMode = o.optBoolean("nightMode", defaults.nightMode),
                 savePasswords = o.optBoolean("savePasswords", defaults.savePasswords),
+                ai = ChatSettings.fromJson(o),
                 fullscreen = o.optBoolean("fullscreen", defaults.fullscreen),
                 customHomeCss = o.optString("customHomeCss", defaults.customHomeCss),
                 homepageLogoPath = o.optString("homepageLogoPath", defaults.homepageLogoPath),
@@ -128,6 +129,7 @@ class SettingsRepository(private val context: Context) {
             .put("textZoom", s.textZoom)
             .put("incognitoDefault", s.incognitoDefault)
             .put("confirmExit", s.confirmExit)
+        ChatSettings.writeTo(o, s.ai)
         return o
     }
 
@@ -382,11 +384,24 @@ class ScriptRepository(
     var scripts by mutableStateOf<List<UserScript>>(emptyList())
         private set
 
+    /** True once the stored list has been read. */
+    @Volatile
+    private var loaded = false
+
     init {
         scope.launch {
             val stored = UserScriptJson.listFromJson(prefs.getString("userscripts", "[]"))
             synchronized(this@ScriptRepository) {
-                if (scripts.isEmpty()) scripts = stored
+                // Merge rather than replace: a script added while the read was
+                // in flight must not be dropped, and the merged result has to be
+                // written back or the add would be lost on the next launch.
+                val pending = scripts
+                val merged = stored + pending.filter { p -> stored.none { it.id == p.id } }
+                scripts = merged
+                loaded = true
+                if (pending.isNotEmpty()) {
+                    prefs.edit().putString("userscripts", UserScriptJson.listToJson(merged)).apply()
+                }
             }
         }
     }
@@ -394,8 +409,12 @@ class ScriptRepository(
     /** Adds a script from its source text; the metadata block names it. */
     fun add(source: String): UserScript {
         val script = UserScript.parse(source, idGen.incrementAndGet())
-        synchronized(this) { scripts = scripts + script }
-        persist()
+        synchronized(this) {
+            scripts = scripts + script
+            // Write while holding the lock so the async initial load cannot
+            // read the old file and persist it over this script.
+            prefs.edit().putString("userscripts", UserScriptJson.listToJson(scripts)).apply()
+        }
         return script
     }
 

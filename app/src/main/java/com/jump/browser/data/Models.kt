@@ -159,6 +159,8 @@ data class AppSettings(
     val nightMode: Boolean = false,
     /** Save logins locally and offer to fill them. */
     val savePasswords: Boolean = false,
+    /** Assistant endpoint settings; empty means not configured. */
+    val ai: ChatSettings = ChatSettings(),
     val fullscreen: Boolean = false,
     val customHomeCss: String = "",
     val homepageLogoPath: String = "",

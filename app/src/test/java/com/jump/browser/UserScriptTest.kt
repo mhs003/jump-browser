@@ -32,6 +32,18 @@ class UserScriptTest {
     }
 
     @Test
+    fun readsSingleLineMetadataBlock() {
+        // A block pasted as one line (as some sites and chat clients produce it)
+        // must still yield separate directives.
+        val single = "// ==UserScript== // @name One Line // @match *://example.com/* " +
+            "// ==/UserScript== document.title='x';"
+        val script = UserScript.parse(single, 3)
+        assertEquals("One Line", script.name)
+        assertEquals(listOf("*://example.com/*"), script.matches)
+        assertTrue(script.appliesTo("https://example.com/a"))
+    }
+
+    @Test
     fun nameFallsBackToFirstCodeLine() {
         val script = UserScript.parse("console.log('hi');", 2)
         assertEquals("console.log('hi');", script.name)
