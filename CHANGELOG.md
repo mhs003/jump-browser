@@ -14,7 +14,9 @@ workflow refuses to publish otherwise.
 
 - Floating surfaces now animate with real platform window animations
   instead of Compose transitions that could never play their exit:
-  - the menu sheet and tab list slide up from the bottom edge (180ms);
+  - the menu sheet and tab list slide up over the reference's 180ms curve
+    with the scrim easing alongside them, instead of using a platform
+    window animation that this device's animation scale compressed;
   - the title Copy / Paste / Paste & Go popup and site info use the
     reference popup animation (fade, 10% rise, 0.9→1.0 scale, 240ms,
     platform bounce interpolator);
