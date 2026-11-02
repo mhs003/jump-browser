@@ -1,9 +1,14 @@
 package com.jump.browser.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
@@ -19,7 +24,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,7 +54,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,8 +80,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -195,69 +196,6 @@ fun TitleActionPopup(
         if (showCopy) TitleAction("Copy", onCopy)
         TitleAction("Paste", onPaste)
         TitleAction("Paste & Go", onPasteAndGo)
-    }
-}
-
-/**
- * The reference title popup is a dialog window animated by `@anim/a`
- * (enter) and `@anim/b` (exit): alpha 0→1, a 10% rise from below and a
- * 0.9→1.0 scale around the bottom-centre pivot, all over 240ms with the
- * platform bounce interpolator. Progress 0 is the closed state and 1 the
- * open state, so one value drives both directions.
- */
-@Composable
-fun TitleMenuPopup(
-    visible: Boolean,
-    showCopy: Boolean,
-    onCopy: () -> Unit,
-    onPaste: () -> Unit,
-    onPasteAndGo: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val holder = remember { OverlayVisibility() }
-    SideEffect {
-        if (visible) holder.show() else holder.hide()
-    }
-    val progressState = rememberOverlayMotion(
-        holder,
-        ReferenceMotion.POPUP_DURATION_MS,
-        ReferenceMotion.SHEET_EASING,
-    )
-    val closed by progressState
-    val density = LocalDensity.current
-    val popupHeightPx = with(density) { 48.dp.toPx() }
-    val alpha = ReferenceMotion.DECELERATE_EASING.transform(closed.coerceIn(0f, 1f))
-    if (holder.present) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.32f * alpha))
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                ) { onDismiss() },
-        ) {
-            TitleActionPopup(
-                showCopy = showCopy,
-                onCopy = onCopy,
-                onPaste = onPaste,
-                onPasteAndGo = onPasteAndGo,
-                modifier = Modifier
-                    .offset(
-                        x = 6.dp,
-                        y = with(density) { WindowInsets.statusBars.getTop(density).toDp() } + 48.dp,
-                    )
-                    // Same property tracks as @anim/a and @anim/b: alpha
-                    // decelerates, the rise and the 0.9→1.0 scale follow the
-                    // platform bounce curve around the pill's bottom edge.
-                    .overlayPopupScale(
-                        progress = closed,
-                        imageEasing = ReferenceMotion.POPUP_IMAGE_EASING,
-                        heightPx = popupHeightPx,
-                        alpha = alpha,
-                    ),
-            )
-        }
     }
 }
 
@@ -618,35 +556,25 @@ fun MenuOverlay(
     onAction: (MenuAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetVisibility = remember { OverlayVisibility() }
-    SideEffect {
-        if (visible) sheetVisibility.show() else sheetVisibility.hide()
-    }
-    val density = LocalDensity.current
-    // The sheet travels by its own height, like the reference which
-    // translates the container by its measured height.
-    val sheetHeightPx = with(density) { (214.dp + 2.dp).roundToPx().toFloat() }
-    val progressState = rememberOverlayMotion(sheetVisibility)
-    val closed by progressState
-    val dragPx = sheetVisibility.dragOffset
-    if (sheetVisibility.present) {
+    val slidePx = with(LocalDensity.current) { 120.dp.roundToPx() }
+    if (visible) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.20f * (1f - closed) * (1f - dragPx / sheetHeightPx).coerceIn(0f, 1f)))
+                .background(Color.Black.copy(alpha = 0.20f))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Box(
-                Modifier
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInVertically(tween(220, easing = FastOutLinearInEasing)) { slidePx } + fadeIn(tween(220)),
+                exit = slideOutVertically(tween(220, easing = FastOutLinearInEasing)) { slidePx } + fadeOut(tween(180)),
+                modifier = Modifier
                     .padding(horizontal = 1.dp)
-                    .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
-                    .overlaySlideUp(closed, sheetHeightPx)
-                    .graphicsLayer { translationY += dragPx }
-                    .sheetDragToDismiss(sheetVisibility, sheetHeightPx),
+                    .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() }),
             ) {
                 MenuSheetContent(
                     tab = tab,
@@ -815,31 +743,24 @@ fun TabPopup(
     onDismiss: () -> Unit,
     bottomInset: Int,
 ) {
-    val popupVisibility = remember { OverlayVisibility() }
-    SideEffect {
-        if (visible) popupVisibility.show() else popupVisibility.hide()
-    }
-    // The reference measures the panel and slides it by that height.
-    val rows = (tabs.size + 1).coerceAtMost(7)
-    val tabHeightPx = with(LocalDensity.current) { (rows * 48).dp.roundToPx().toFloat() }
-    val popupProgressState = rememberOverlayMotion(popupVisibility)
-    val closed by popupProgressState
-    if (popupVisibility.present) {
+    val tabSlidePx = with(LocalDensity.current) { 120.dp.roundToPx() }
+    if (visible) {
         Box(
             Modifier
                 .fillMaxSize()
                 .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
-                .background(Color.Black.copy(alpha = 0.25f * (1f - closed)))
+                .background(Color.Black.copy(alpha = 0.25f))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Box(
-                Modifier
-                    .overlaySlideUp(closed, tabHeightPx)
-                    .sheetDragToDismiss(popupVisibility, tabHeightPx),
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInVertically(tween(160, easing = FastOutLinearInEasing)) { tabSlidePx } + fadeIn(tween(160)),
+                exit = slideOutVertically(tween(160, easing = FastOutLinearInEasing)) { tabSlidePx } + fadeOut(tween(160)),
+                modifier = Modifier,
             ) {
                 Surface(
                     Modifier

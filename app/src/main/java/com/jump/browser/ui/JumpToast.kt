@@ -1,8 +1,12 @@
 package com.jump.browser.ui
 
 import android.content.Context
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -102,21 +106,18 @@ fun JumpToastHost(modifier: Modifier = Modifier) {
             .padding(bottom = with(density) { 76.dp }),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        val toastVisibility = remember { OverlayVisibility() }
-        SideEffect {
-            if (request != null) toastVisibility.show() else toastVisibility.hide()
-        }
-        val toastProgressState = rememberOverlayMotion(toastVisibility)
-        val closed by toastProgressState
-        if (toastVisibility.present) {
-            val data = visibleData ?: return@Box
+        AnimatedVisibility(
+            visible = request != null,
+            enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { lift },
+            exit = fadeOut(tween(180)) + slideOutVertically(tween(180)) { lift },
+        ) {
+            val data = visibleData ?: return@AnimatedVisibility
             Row(
-                modifier = Modifier
+                Modifier
                     .widthIn(max = 360.dp)
                     .clip(RoundedCornerShape(30.dp))
                     .background(Color(0xCC1E1E1E))
-                    .padding(start = 16.dp)
-                    .overlaySlideUp(closed, lift.toFloat()),
+                    .padding(start = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
