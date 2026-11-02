@@ -12,13 +12,16 @@ workflow refuses to publish otherwise.
 
 ### Fixed
 
-- The menu sheet, tab popup and toast now use the reference's 180ms
-  `PathInterpolator(0.2, 0.2, 0.8, 0.8)` slide and their scrim fades with the
-  panel instead of appearing instantly. Exits are animated too: content stays
-  composed until the leave animation finishes.
-- The title-bar Copy / Paste / Paste & Go popup now runs the reference dialog
-  window animation (`@anim/a` / `@anim/b`): 240ms alpha, a 10% rise and a
-  0.9→1.0 scale on the platform bounce interpolator, in both directions.
+- Overlay open/close animations. The menu sheet, tab list and toast slide by
+  their own height over 180ms with the reference
+  `PathInterpolator(0.2, 0.2, 0.8, 0.8)`, with scrims that fade with the panel.
+  Exits are animated now: content stays composed until the leave animation
+  finishes instead of vanishing.
+- The title-bar Copy / Paste / Paste & Go popup runs the reference window
+  animation (`@anim/a` / `@anim/b`) in both directions: decelerating alpha
+  plus a 10% rise and a 0.9→1.0 scale on the platform bounce curve.
+- The site info panel dropped in with no animation; it now uses the mirrored
+  popup animation from the title bar.
 
 ### Changed
 
