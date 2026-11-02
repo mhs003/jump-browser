@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-02
+
 ### Changed
 
 - The release workflow now records the Gradle output in the run summary and
