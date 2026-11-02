@@ -48,10 +48,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.jump.browser.ui.theme.Icon
+import com.jump.browser.ui.theme.MaterialTheme
+import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -87,6 +86,7 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
+import com.jump.browser.ui.theme.Surface
 
 enum class MenuAction {
     NIGHT, BOOKMARKS, HISTORY, DOWNLOADS, INCOGNITO, SHARE, ADD_BOOKMARK, DESKTOP, TOOLS, SETTINGS,
@@ -493,7 +493,7 @@ fun BottomBar(
                 .clip(RoundedCornerShape(18.dp))
                 .combinedClickable(
                     interactionSource = countInteraction,
-                    indication = androidx.compose.material3.ripple(
+                    indication = com.jump.browser.ui.theme.ripple(
                         color = com.jump.browser.ui.theme.JumpRipple,
                     ),
                     onClick = onTabs,
@@ -526,7 +526,7 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
             .clip(RoundedCornerShape(18.dp))
             .combinedClickable(
                 interactionSource = interaction,
-                indication = androidx.compose.material3.ripple(
+                indication = com.jump.browser.ui.theme.ripple(
                     color = com.jump.browser.ui.theme.JumpRipple,
                 ),
                 enabled = enabled,

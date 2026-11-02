@@ -53,14 +53,11 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ripple
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import com.jump.browser.ui.theme.Icon
+import com.jump.browser.ui.theme.MaterialTheme
+import com.jump.browser.ui.theme.Surface
+import com.jump.browser.ui.theme.ripple
+import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,6 +93,8 @@ import com.jump.browser.data.DownloadTask
 import com.jump.browser.data.HistoryEntry
 import com.jump.browser.data.SearchEngine
 import com.jump.browser.ui.theme.JumpAccent
+import com.jump.browser.ui.theme.LinearProgressIndicator
+import com.jump.browser.ui.theme.Button
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -1225,7 +1224,7 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("$backgroundDraft%", fontSize = 14.sp)
-                    androidx.compose.material3.Slider(
+                    JumpSlider(
                         value = backgroundDraft.toFloat(),
                         onValueChange = { backgroundDraft = it.toInt() },
                         valueRange = 0f..100f,
@@ -1326,7 +1325,7 @@ fun JumpOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
             .height(43.dp)
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = androidx.compose.material3.ripple(color = com.jump.browser.ui.theme.JumpRipple),
+                indication = com.jump.browser.ui.theme.ripple(color = com.jump.browser.ui.theme.JumpRipple),
                 onClick = onClick,
             ),
         verticalAlignment = Alignment.CenterVertically,

@@ -21,12 +21,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.jump.browser.ui.theme.Icon
+import com.jump.browser.ui.theme.MaterialTheme
+import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +43,8 @@ import androidx.compose.ui.unit.sp
 import com.jump.browser.browser.ReaderData
 import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.JumpMuted
+import com.jump.browser.ui.theme.Surface
+import com.jump.browser.ui.theme.Button
 
 @Composable
 fun ReaderContent(data: ReaderData, modifier: Modifier = Modifier) {

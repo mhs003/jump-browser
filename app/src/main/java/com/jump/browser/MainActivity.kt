@@ -79,9 +79,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings = app.container.settings.settings
             val systemDark = isSystemInDarkTheme()
-            // Night mode in the menu is separate from the app chrome theme: it
-            // darkens web pages (like the reference's injected night CSS).
-            val dark = settings.nightMode || when (settings.darkMode) {
+            // The chrome theme and "Night mode" are two different things and
+            // must not overwrite each other: `darkMode` decides the app's own
+            // colours, `nightMode` decides whether web pages are darkened.
+            // Merging them (dark = nightMode || darkMode) made the bottom-sheet
+            // Night toggle impossible to turn off while Theme was set to Dark.
+            val dark = when (settings.darkMode) {
                 DarkMode.SYSTEM -> systemDark
                 DarkMode.LIGHT -> false
                 DarkMode.DARK -> true

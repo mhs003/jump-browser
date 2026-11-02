@@ -26,11 +26,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.jump.browser.ui.theme.Icon
+import com.jump.browser.ui.theme.MaterialTheme
+import com.jump.browser.ui.theme.Text
+import com.jump.browser.ui.theme.TextButton
+import com.jump.browser.ui.theme.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect

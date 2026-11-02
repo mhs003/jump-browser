@@ -40,6 +40,48 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // The app ships its own JNI-free UI; the only native code comes from
+        // CameraX and Compose. 32-bit x86 is emulator-only, so dropping it
+        // removes ~114KB of libraries no real device loads.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+    }
+
+    // Split the APK per ABI in release so a device download carries only its
+    // own native libraries.
+    splits {
+        abi {
+            isEnable = false
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
+    packaging {
+        resources {
+            // Licences and Kotlin metadata are not read at runtime; they were
+            // ~23KB of the compressed APK.
+            excludes += setOf(
+                "META-INF/**",
+                "DebugProbesKt.bin",
+                "kotlin/**",
+                "**/*.kotlin_metadata",
+                "**/*.kotlin_builtins",
+                "**/LICENSE*",
+                "**/NOTICE*",
+                "version",
+                "**/androidx/*",
+            )
+        }
+        dex {
+            // AGP 9 stores the dex uncompressed by default (faster cold start,
+            // but ~1.5MB larger on disk). The size budget matters more here,
+            // so keep the dex deflated.
+            useLegacyPackaging = true
+        }
     }
 
     signingConfigs {
@@ -86,8 +128,9 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    implementation(libs.androidx.ui.text)
+    implementation(libs.androidx.foundation)
+    implementation(libs.androidx.animation)
 
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

@@ -40,11 +40,8 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.jump.browser.ui.theme.MaterialTheme
+import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -85,6 +82,7 @@ import com.jump.browser.data.DarkMode
 import com.jump.browser.data.DownloadTask
 import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.JumpScrim
+import com.jump.browser.ui.theme.Surface
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
@@ -140,8 +138,11 @@ fun BrowserRoot(
     var lastBack by remember { mutableLongStateOf(0L) }
     val rootView = LocalView.current
 
-    LaunchedEffect(dark) {
-        controller.isDarkTheme = dark
+    // Web pages are darkened by "Night mode", independently of the chrome
+    // theme. When the chrome follows the system, the page follows suit.
+    val pageDark = settings.nightMode || (settings.darkMode == DarkMode.SYSTEM && dark)
+    LaunchedEffect(pageDark) {
+        controller.isDarkTheme = pageDark
     }
 
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -530,11 +531,24 @@ fun BrowserRoot(
                 showMenu = false
                 when (action) {
                     MenuAction.NIGHT -> {
-                        val next = !settings.nightMode
-                        container.settings.update { it.copy(nightMode = next) }
-                        controller.isDarkTheme = next || settings.darkMode == DarkMode.DARK
-                        controller.applySettingsToAll()
-                        controller.reload()
+                        // The sheet's Night button flips the page darkening. If
+                        // the chrome theme is pinned (not following the system),
+                        // mirror the choice into it so the whole app switches
+                        // together instead of the page and chrome disagreeing.
+                        val next = !pageDark
+                        container.settings.update {
+                            it.copy(
+                                nightMode = next,
+                                darkMode = if (it.darkMode == DarkMode.SYSTEM) {
+                                    DarkMode.SYSTEM
+                                } else if (next) {
+                                    DarkMode.DARK
+                                } else {
+                                    DarkMode.LIGHT
+                                },
+                            )
+                        }
+                        controller.applyDarkModeToAll()
                     }
                     MenuAction.BOOKMARKS -> { recordsTab = 0; openPage(LibraryPage.RECORDS) }
                     MenuAction.HISTORY -> { recordsTab = 1; openPage(LibraryPage.RECORDS) }

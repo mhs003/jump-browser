@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -36,11 +37,11 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
+import com.jump.browser.ui.theme.Icon
+import com.jump.browser.ui.theme.LocalTextStyle
+import com.jump.browser.ui.theme.MaterialTheme
+import com.jump.browser.ui.theme.Text
+import com.jump.browser.ui.theme.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
@@ -79,6 +80,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.JumpPressed
@@ -560,7 +564,7 @@ fun JumpAlertDialog(
                 ) { close() },
             contentAlignment = Alignment.Center,
         ) {
-            androidx.compose.material3.Surface(
+            Box(
                 modifier = modifier
                     .fillMaxWidth(0.8f)
                     .widthIn(max = 288.dp)
@@ -601,11 +605,9 @@ fun JumpAlertDialog(
                                 drag.snapTo((drag.value + amount).coerceIn(0f, cardWidth.toFloat()))
                             }
                         }
-                    },
-                shape = shape,
-                color = containerColor,
-                tonalElevation = tonalElevation,
-                shadowElevation = 0.dp,
+                    }
+                    .clip(shape)
+                    .background(containerColor),
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     Column(
@@ -666,5 +668,68 @@ fun JumpAlertDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * Minimal slider used where a percentage is adjusted. Material3's Slider is a
+ * large component; this keeps the same hit area and behaviour for a fraction
+ * of the code.
+ */
+@Composable
+fun JumpSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    modifier: Modifier = Modifier,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.outlineVariant
+    var widthPx by remember { mutableFloatStateOf(0f) }
+    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
+    val fraction = ((value - valueRange.start) / span).coerceIn(0f, 1f)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .onSizeChanged { widthPx = it.width.toFloat() }
+            .pointerInput(valueRange, widthPx) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        onValueChange(
+                            valueRange.start + (offset.x / widthPx).coerceIn(0f, 1f) * span,
+                        )
+                    },
+                ) { change, _ ->
+                    change.consume()
+                    onValueChange(
+                        valueRange.start +
+                            (change.position.x / widthPx).coerceIn(0f, 1f) * span,
+                    )
+                }
+            }
+            .pointerInput(valueRange, widthPx) {
+                detectTapGestures { offset ->
+                    onValueChange(
+                        valueRange.start + (offset.x / widthPx).coerceIn(0f, 1f) * span,
+                    )
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Canvas(Modifier.fillMaxWidth().height(4.dp)) {
+            drawRoundRect(track, cornerRadius = CornerRadius(size.height / 2))
+            drawRoundRect(
+                accent,
+                size = Size(size.width * fraction, size.height),
+                cornerRadius = CornerRadius(size.height / 2),
+            )
+        }
+        Box(
+            Modifier
+                .offset { IntOffset((widthPx * fraction - 10.dp.toPx()).roundToInt(), 0) }
+                .size(20.dp)
+                .background(accent, CircleShape),
+        )
     }
 }

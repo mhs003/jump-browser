@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import com.jump.browser.ui.JumpToast
 import com.jump.browser.data.AppContainer
 import com.jump.browser.data.TabSnapshot
@@ -562,47 +563,69 @@ class BrowserController(
         sessions.values.forEach { it.webView?.let(::applyDarkMode) }
     }
 
+    /**
+     * Darkens web pages the way the reference does: through Chromium's own
+     * algorithmic darkening, not by injecting CSS.
+     *
+     * Algorithmic darkening (Android 10+ via androidx.webkit, or the older
+     * `FORCE_DARK_AUTO`/`FORCE_DARK_ON` flags) is performed by the engine after
+     * layout, so it keeps images, gradients and contrast intact and only
+     * inverts the areas a site left at default colours. The previous approach
+     * forced `!important` backgrounds and text colours over every element,
+     * which broke layouts and erased images on real sites.
+     */
     private fun applyDarkMode(w: WebView) {
+        val dark = isDarkTheme
         runCatching {
-            WebSettingsCompat.setAlgorithmicDarkeningAllowed(w.settings, false)
-            WebSettingsCompat.setForceDark(w.settings, WebSettingsCompat.FORCE_DARK_OFF)
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                WebSettingsCompat.setAlgorithmicDarkeningAllowed(w.settings, dark)
+            } else if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                WebSettingsCompat.setForceDark(
+                    w.settings,
+                    if (dark) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF,
+                )
+            }
         }
-        if (Build.VERSION.SDK_INT >= 29) {
+        if (Build.VERSION.SDK_INT in 29..32) {
             @Suppress("DEPRECATION")
-            w.settings.forceDark = WebSettings.FORCE_DARK_OFF
+            runCatching {
+                w.settings.forceDark =
+                    if (dark) WebSettings.FORCE_DARK_ON else WebSettings.FORCE_DARK_OFF
+            }
         }
-        // Mirrors the reference night stylesheet: forced dark background, gray
-        // text, teal links and dimmed visited links. Images are left intact.
-        val darkCss = """
-            html{background-color:#000!important}
-            *{color:#999!important;box-shadow:none!important;background-color:transparent!important;
-              border-color:#444!important;border-top-color:#444!important;border-bottom-color:#444!important;
-              border-left-color:#444!important;border-right-color:#444!important}
-            body{background-color:transparent!important}
-            :after,:before{background-color:transparent!important;border-color:#444!important}
-            a,a *{color:#409B9B!important;text-decoration:none!important}
-            a:hover,a:hover *,a:visited:hover,a:visited:hover *{color:#F0F0F0!important}
-            a:visited,a:visited *{color:#607069!important}
-            h1,h2,h3,h4,h5,h6,strong,[class*=header],[id*=header]{color:#DDD!important}
-            code,pre,blockquote{background-color:#111!important}
-            input,textarea,select,button{background-color:#151515!important;color:#BBB!important}
-            ::selection{background-color:#377!important;color:#000!important}
-        """.trimIndent()
-        val js = if (isDarkTheme) {
-            "(function(){var s=document.getElementById('jump-night-css');" +
-                "if(!s){s=document.createElement('style');s.id='jump-night-css';(document.head||document.documentElement).appendChild(s);}" +
-                "s.textContent=${JSONObject.quote(darkCss)};})()"
-        } else {
-            "(function(){var s=document.getElementById('jump-night-css');if(s)s.remove();})()"
-        }
-        w.evaluateJavascript(js, null)
+    }
+
+    /**
+     * Tells the renderer that this page should use a dark colour scheme.
+     *
+     * Sites that ship a dark theme do it with `@media (prefers-color-scheme:
+     * dark)` and a `color-scheme` declaration. Setting the root `color-scheme`
+     * makes that media query match, so those sites render their own proper
+     * dark design; Chromium's algorithmic darkening then covers the sites that
+     * have no dark theme of their own. Nothing here overrides colours, so
+     * layout, images and contrast are left exactly as the site intended.
+     */
+    private fun syncColorScheme(w: WebView) {
+        val scheme = if (isDarkTheme) "dark" else "light"
+        w.evaluateJavascript(
+            "(function(){var d=document.documentElement;" +
+                "if(d){d.style.colorScheme='$scheme';}})()",
+            null,
+        )
     }
 
     var isDarkTheme: Boolean = false
         set(value) {
             if (field == value) return
             field = value
+            val changed = sessions.values.mapNotNull { it.webView }
             applyDarkModeToAll()
+            // Algorithmic darkening is applied by the renderer, so an already
+            // loaded page keeps its old appearance until it relayouts.
+            changed.forEach { w ->
+                if (w.url.isNullOrBlank() || w.url == "about:blank") return@forEach
+                syncColorScheme(w)
+            }
         }
 
     // --------------------------------------------------------------- webview
@@ -856,6 +879,7 @@ class BrowserController(
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
             super.onPageStarted(view, url, favicon)
+            view?.let(::syncColorScheme)
             if (url == null) return
             if (url == "about:blank") return
             update(id) {
@@ -887,7 +911,8 @@ class BrowserController(
                     secure = UrlUtils.isSecure(url),
                 )
             }
-            applyDarkMode(view)
+
+            syncColorScheme(view)
             if (app.settings.settings.doNotTrack) {
                 view.evaluateJavascript(
                     "Object.defineProperty(navigator,'doNotTrack',{get:function(){return '1';},configurable:true});" +
