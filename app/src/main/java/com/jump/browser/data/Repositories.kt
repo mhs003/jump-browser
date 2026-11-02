@@ -319,6 +319,60 @@ class HistoryRepository(
     }
 }
 
+class ScriptRepository(
+    private val context: Context,
+    private val scope: CoroutineScope,
+) {
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val idGen = AtomicLong(System.currentTimeMillis())
+    var scripts by mutableStateOf<List<UserScript>>(emptyList())
+        private set
+
+    init {
+        scope.launch {
+            val stored = UserScriptJson.listFromJson(prefs.getString("userscripts", "[]"))
+            synchronized(this@ScriptRepository) {
+                if (scripts.isEmpty()) scripts = stored
+            }
+        }
+    }
+
+    /** Adds a script from its source text; the metadata block names it. */
+    fun add(source: String): UserScript {
+        val script = UserScript.parse(source, idGen.incrementAndGet())
+        synchronized(this) { scripts = scripts + script }
+        persist()
+        return script
+    }
+
+    fun remove(id: Long) {
+        synchronized(this) { scripts = scripts.filterNot { it.id == id } }
+        persist()
+    }
+
+    fun setEnabled(id: Long, enabled: Boolean) {
+        synchronized(this) {
+            scripts = scripts.map { if (it.id == id) it.copy(enabled = enabled) else it }
+        }
+        persist()
+    }
+
+    /** Scripts that should run for [url], in install order. */
+    fun forUrl(url: String?): List<UserScript> {
+        if (url == null) return emptyList()
+        return scripts.filter { it.appliesTo(url) }
+    }
+
+    private fun persist() {
+        val snapshot = scripts
+        scope.launch {
+            runCatching {
+                prefs.edit().putString("userscripts", UserScriptJson.listToJson(snapshot)).apply()
+            }
+        }
+    }
+}
+
 class TabStore(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -549,5 +603,6 @@ class AppContainer(context: Context) {
     val history: HistoryRepository by lazy { HistoryRepository(context, scope) }
     val downloads: DownloadRepository by lazy { DownloadRepository(context, scope) }
     val tabs: TabStore by lazy { TabStore(context) }
+    val scripts: ScriptRepository by lazy { ScriptRepository(context, scope) }
     val filesDir: File = context.filesDir
 }

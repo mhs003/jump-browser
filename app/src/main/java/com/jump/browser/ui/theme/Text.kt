@@ -1,6 +1,13 @@
 package com.jump.browser.ui.theme
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -229,5 +236,42 @@ fun LinearProgressIndicator(
     Canvas(modifier) {
         drawRect(trackColor)
         drawRect(color, size = Size(size.width * fraction, size.height))
+    }
+}
+
+/** Animated on/off switch. */
+@Composable
+fun Switch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    val offset by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = tween(160),
+        label = "switch",
+    )
+    val trackColor = if (checked) colors.primary else colors.outlineVariant
+    val interactive = remember { MutableInteractionSource() }
+    Box(
+        modifier
+            .size(width = 42.dp, height = 26.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(trackColor)
+            .clickable(
+                enabled = enabled,
+                indication = ripple(bounded = false),
+                interactionSource = interactive,
+            ) { onCheckedChange(!checked) },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            Modifier
+                .offset { IntOffset((if (checked) 18.dp else 2.dp).roundToPx(), 0) }
+                .size(22.dp)
+                .background(Color.White, CircleShape),
+        )
     }
 }

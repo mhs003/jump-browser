@@ -755,6 +755,10 @@ fun SettingsScreen(
     onAbout: () -> Unit,
     onExportBookmarks: (String) -> Unit = {},
     onImportBookmarks: (onDone: (Int) -> Unit) -> Unit = { it(0) },
+    scripts: List<com.jump.browser.data.UserScript> = emptyList(),
+    onAddScript: (String) -> Unit = {},
+    onRemoveScript: (Long) -> Unit = {},
+    onToggleScript: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     var category by remember { mutableStateOf<String?>(null) }
@@ -935,9 +939,81 @@ fun SettingsScreen(
                 }
             }
             "Scripts" -> {
+                var scriptSource by remember { mutableStateOf("") }
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 5.75.dp)) {
-                    item { SettingsLabelRow("Userscripts", "No scripts installed") { toast("Script support is not available") } }
+                    item {
+                        SettingsLabelRow(
+                            "Add userscript",
+                            if (scripts.isEmpty()) "No scripts installed" else null,
+                        ) { scriptSource = ""; dialog = "addScript" }
+                    }
+                    items(scripts, key = { it.id }) { script ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    script.name,
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                )
+                                Text(
+                                    if (script.matches.isEmpty()) "All sites"
+                                    else script.matches.joinToString(", "),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                )
+                            }
+                            com.jump.browser.ui.theme.Switch(
+                                checked = script.enabled,
+                                onCheckedChange = { onToggleScript(script.id, it) },
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            com.jump.browser.ui.theme.TextButton(onClick = { onRemoveScript(script.id) }) {
+                                Text("Delete", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
                     item { Spacer(Modifier.height(24.dp)) }
+                }
+                if (dialog == "addScript") {
+                    JumpAlertDialog(
+                        onDismissRequest = { dialog = null },
+                        title = { Text("Add userscript") },
+                        text = {
+                            Column {
+                                Text(
+                                    "Paste a userscript. The // ==UserScript== header supplies " +
+                                        "its name and the sites it applies to.",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                JumpTextField(
+                                    value = scriptSource,
+                                    onValueChange = { scriptSource = it },
+                                    singleLine = false,
+                                    minLines = 6,
+                                    placeholder = "// ==UserScript==\n// @name My script\n// @match *://*/*\n// ==/UserScript==",
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            JumpDialogButton(
+                                enabled = scriptSource.isNotBlank(),
+                                onClick = {
+                                    onAddScript(scriptSource)
+                                    scriptSource = ""
+                                    dialog = null
+                                },
+                            ) { Text("Add") }
+                        },
+                        dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+                    )
                 }
             }
             "About" -> {

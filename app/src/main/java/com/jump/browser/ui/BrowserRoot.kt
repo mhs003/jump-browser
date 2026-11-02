@@ -826,6 +826,20 @@ fun BrowserRoot(
                                 exportLauncher.launch("bookmarks.html")
                             }
                         },
+                        scripts = container.scripts.scripts,
+                        onAddScript = { source ->
+                            val script = container.scripts.add(source)
+                            JumpToast.show(context, "Added \"${script.name}\"")
+                            controller.reload()
+                        },
+                        onRemoveScript = { id ->
+                            container.scripts.remove(id)
+                            controller.reload()
+                        },
+                        onToggleScript = { id, enabled ->
+                            container.scripts.setEnabled(id, enabled)
+                            controller.reload()
+                        },
                         onImportBookmarks = { done ->
                             importCallback = done
                             runCatching { importLauncher.launch(arrayOf("text/html", "text/plain", "*/*")) }

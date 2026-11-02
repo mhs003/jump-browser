@@ -415,6 +415,7 @@ fun JumpTextField(
     imeAction: ImeAction = ImeAction.Done,
     onImeAction: (() -> Unit)? = null,
     autoFocus: Boolean = false,
+    minLines: Int = 1,
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(autoFocus) {
@@ -453,7 +454,7 @@ fun JumpTextField(
                             placeholder,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+                            maxLines = if (minLines > 1) minLines else 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }

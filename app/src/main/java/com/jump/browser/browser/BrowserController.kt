@@ -810,6 +810,24 @@ class BrowserController(
         if (networkLogging) panelsRevision++
     }
 
+    /**
+     * Runs the installed user scripts whose `@match` patterns cover [url].
+     *
+     * Each script is wrapped so one failing script cannot abort the rest, and
+     * so its errors surface in the WebView console instead of silently
+     * stopping the injection.
+     */
+    fun injectUserScripts(view: WebView, url: String?) {
+        if (url == null || !url.startsWith("http")) return
+        val scripts = runCatching { app.scripts.forUrl(url) }.getOrDefault(emptyList())
+        if (scripts.isEmpty()) return
+        scripts.forEach { script ->
+            val wrapped = "(function(){try{\n${script.source}\n}catch(e){" +
+                "console.error('Jump script \"${script.name.replace("\"", "'")}\" failed:',e);}})();"
+            view.evaluateJavascript(wrapped, null)
+        }
+    }
+
     private fun applyAdBlocking(view: WebView) {
         val host = UrlUtils.host(view.url)
         if (AdBlocker.isSiteException(host)) {
@@ -929,6 +947,17 @@ class BrowserController(
         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
             super.onPageStarted(view, url, favicon)
             view?.let(::syncColorScheme)
+            // document-start scripts have to be in before parsing continues.
+            if (view != null && url != null) {
+                val early = runCatching { app.scripts.forUrl(url) }.getOrDefault(emptyList())
+                    .filter { it.runAtStart }
+                early.forEach { script ->
+                    view.evaluateJavascript(
+                        "(function(){try{${script.source}}catch(e){}})();",
+                        null,
+                    )
+                }
+            }
             if (url == null) return
             if (url == "about:blank") return
             update(id) {
@@ -962,6 +991,7 @@ class BrowserController(
             }
 
             syncColorScheme(view)
+            injectUserScripts(view, url)
             if (app.settings.settings.doNotTrack) {
                 view.evaluateJavascript(
                     "Object.defineProperty(navigator,'doNotTrack',{get:function(){return '1';},configurable:true});" +
