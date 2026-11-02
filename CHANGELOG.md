@@ -10,6 +10,12 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Changed
+
+- The release workflow now records the Gradle output in the run summary and
+  uploads `release-build-log` when the build fails, so CI-only breakage can be
+  diagnosed without repository admin access.
+
 ## [1.0.2] - 2026-11-02
 
 ### Fixed

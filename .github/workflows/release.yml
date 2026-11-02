@@ -120,7 +120,28 @@ jobs:
           } > keystore.properties
 
       - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Report build failure
+        if: failure()
+        run: |
+          {
+            echo "## Release build failed"
+            echo '```'
+            grep -A 20 -E "What went wrong|FAILURE:" "$RUNNER_TEMP/build.log" | head -60 || tail -60 "$RUNNER_TEMP/build.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-log
+          path: ${{ runner.temp }}/build.log
+          if-no-files-found: ignore
+          retention-days: 5
 
       - name: Package artifact
         id: artifact
