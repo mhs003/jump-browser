@@ -762,6 +762,8 @@ fun SettingsScreen(
     logins: List<com.jump.browser.data.SavedLogin> = emptyList(),
     onRemoveLogin: (Long) -> Unit = {},
     onClearLogins: () -> Unit = {},
+    onExportData: () -> Unit = {},
+    onImportData: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var category by remember { mutableStateOf<String?>(null) }
@@ -805,7 +807,7 @@ fun SettingsScreen(
             }
             "General" -> {
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 13.dp)) {
-                    item { SettingsLabelRow("Sync") { toast("Sync is not enabled") } }
+                    item { SettingsLabelRow("Sync", "Local only") { dialog = "sync" } }
                     item { SettingsLabelRow("User-agent", activeUserAgentLabel(settings.desktopMode)) { dialog = "userAgent" } }
                     item { SettingsLabelRow("Clear data") { dialog = "clear" } }
                     item { SettingsLabelRow("Ad blocking", if (settings.adBlock) null else "Off") {
@@ -861,8 +863,8 @@ fun SettingsScreen(
                     item {
                         SettingsLabelRow("Export bookmarks") { dialog = "exportBookmarks" }
                     }
-                    item { SettingsLabelRow("Import data") { toast("Nothing to import") } }
-                    item { SettingsLabelRow("Export data") { toast("Nothing to export") } }
+                    item { SettingsLabelRow("Import data") { dialog = "importData" } }
+                    item { SettingsLabelRow("Export data") { dialog = "exportData" } }
                     item { SettingsLabelRow("Restore tabs on startup", if (settings.restoreTabs) null else "Off") {
                         onSettingsChange { it.copy(restoreTabs = !it.restoreTabs) }
                     } }
@@ -1308,6 +1310,64 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
+        )
+    }
+    if (dialog == "sync") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Sync") },
+            text = {
+                Text(
+                    "Jump keeps everything on this device. There is no account and no server: " +
+                        "bookmarks, history, settings and passwords never leave the phone, and " +
+                        "saved passwords are excluded from backups by design.\n\n" +
+                        "To move your data to another device, use Settings -> Export data and " +
+                        "then Import data there.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = { dialog = "exportData" }) { Text("Export data") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Close") } },
+        )
+    }
+    if (dialog == "importData") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Import data") },
+            text = {
+                Text(
+                    "Choose a Jump backup file. Bookmarks and history are merged into what " +
+                        "you already have, and settings are applied. Saved passwords are never " +
+                        "included in a backup.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = { dialog = null; onImportData() }) { Text("Choose file") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+    if (dialog == "exportData") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Export data") },
+            text = {
+                Text(
+                    "Saves a backup file with your settings, bookmarks and history. " +
+                        "Passwords are not included.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = { dialog = null; onExportData() }) { Text("Export") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "passwords") {

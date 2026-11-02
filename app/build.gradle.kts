@@ -135,6 +135,9 @@ dependencies {
     implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
+    // org.json is stubbed in local tests; use the real implementation so the
+    // backup and script persistence code can be exercised.
+    testImplementation(libs.json)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -144,24 +144,29 @@ fun BrowserRoot(
 
     // Bookmark import/export through the system file pickers, so files come
     // from and go to wherever the user keeps them (including Downloads).
-    var pendingExport by remember { mutableStateOf<String?>(null) }
+    var pendingExport by remember { mutableStateOf<Triple<String, String, String>?>(null) }
     var importCallback by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    // True when the open-document result should be handled as a full backup
+    // rather than a bookmarks file.
+    var pendingImport by remember { mutableStateOf(false) }
 
+    // Export goes through the system "create document" picker so the file lands
+    // wherever the user keeps documents, including Downloads.
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/html"),
     ) { uri ->
-        val html = pendingExport
+        val pending = pendingExport
         pendingExport = null
-        if (uri == null || html == null) return@rememberLauncherForActivityResult
+        if (uri == null || pending == null) return@rememberLauncherForActivityResult
         scope.launch {
             val written = withContext(Dispatchers.IO) {
                 runCatching {
                     context.contentResolver.openOutputStream(uri)?.use { out ->
-                        out.write(html.toByteArray())
+                        out.write(pending.third.toByteArray())
                     }
                 }.isSuccess
             }
-            JumpToast.show(context, if (written) "Bookmarks exported" else "Could not write the file")
+            JumpToast.show(context, if (written) "${pending.second} saved" else "Could not write the file")
         }
     }
 
@@ -170,19 +175,45 @@ fun BrowserRoot(
     ) { uri ->
         val done = importCallback
         importCallback = null
+        val asBackup = pendingImport
+        pendingImport = false
         if (uri == null) {
             done?.invoke(0)
             return@rememberLauncherForActivityResult
         }
         scope.launch {
-            val added = withContext(Dispatchers.IO) {
+            val text = withContext(Dispatchers.IO) {
                 runCatching {
-                    val text = context.contentResolver.openInputStream(uri)
+                    context.contentResolver.openInputStream(uri)
                         ?.bufferedReader()?.use { it.readText() }.orEmpty()
-                    container.bookmarks.importHtml(text)
-                }.getOrDefault(0)
+                }.getOrDefault("")
             }
-            done?.invoke(added)
+            if (!asBackup) {
+                val added = withContext(Dispatchers.IO) { container.bookmarks.importHtml(text) }
+                done?.invoke(added)
+                return@launch
+            }
+            when (val parsed = com.jump.browser.data.Backup.parse(text)) {
+                is com.jump.browser.data.Backup.Result.Invalid ->
+                    JumpToast.show(context, parsed.reason)
+                is com.jump.browser.data.Backup.Result.Ok -> {
+                    val snap = parsed.snapshot
+                    val bookmarksAdded = container.bookmarks.mergeAll(
+                        com.jump.browser.data.Bookmark.listFromJson(snap.bookmarks.toString()),
+                    )
+                    val historyAdded = container.history.mergeAll(
+                        com.jump.browser.data.HistoryEntry.listFromJson(snap.history.toString()),
+                    )
+                    withContext(Dispatchers.Main) {
+                        container.settings.restoreJson(snap.settings)
+                        controller.applySettingsToAll()
+                    }
+                    JumpToast.show(
+                        context,
+                        "Imported $bookmarksAdded bookmarks and $historyAdded history entries",
+                    )
+                }
+            }
         }
     }
 
@@ -856,10 +887,22 @@ fun BrowserRoot(
                         settings = settings,
                         onBack = { page = LibraryPage.NONE },
                         onExportBookmarks = { html ->
-                            pendingExport = html
-                            runCatching {
-                                exportLauncher.launch("bookmarks.html")
-                            }
+                            pendingExport = Triple("text/html", "bookmarks.html", html)
+                            runCatching { exportLauncher.launch("bookmarks.html") }
+                        },
+                        onExportData = {
+                            val backup = com.jump.browser.data.Backup.build(
+                                settings = container.settings.exportJson(),
+                                bookmarks = container.bookmarks.bookmarks,
+                                history = container.history.entries,
+                            )
+                            pendingExport = Triple("application/json", "jump-backup.json", backup)
+                            runCatching { exportLauncher.launch("jump-backup.json") }
+                        },
+                        onImportData = {
+                            importCallback = null
+                            pendingImport = true
+                            runCatching { importLauncher.launch(arrayOf("application/json", "*/*")) }
                         },
                         logins = container.passwords.logins,
                         onRemoveLogin = { container.passwords.remove(it) },

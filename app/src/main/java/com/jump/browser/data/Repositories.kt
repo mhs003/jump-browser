@@ -76,7 +76,27 @@ class SettingsRepository(private val context: Context) {
         save(next)
     }
 
-    private fun save(s: AppSettings) {
+    /** The settings as stored, for a backup file. */
+    fun exportJson(): JSONObject = settingsJson(settings)
+
+    /**
+     * Applies settings from a backup. Device-specific paths (a custom logo
+     * stored under this app's files dir) are kept as they are, and the file is
+     * re-read through the normal loader so defaults and migrations apply.
+     */
+    fun restoreJson(o: JSONObject) {
+        val current = settingsJson(settings)
+        Backup.deviceOnlySettings.forEach { key ->
+            current.optString(key).takeIf { it.isNotEmpty() }?.let { current.put(key, it) }
+        }
+        o.keys().forEach { key ->
+            if (key !in Backup.deviceOnlySettings) current.put(key, o.get(key))
+        }
+        prefs.edit().putString("settings_json", current.toString()).apply()
+        settings = load()
+    }
+
+    private fun settingsJson(s: AppSettings): JSONObject {
         val o = JSONObject()
             .put("searchEngineId", s.searchEngineId)
             .put("nightMode", s.nightMode)
@@ -108,7 +128,11 @@ class SettingsRepository(private val context: Context) {
             .put("textZoom", s.textZoom)
             .put("incognitoDefault", s.incognitoDefault)
             .put("confirmExit", s.confirmExit)
-        prefs.edit().putString("settings_json", o.toString()).apply()
+        return o
+    }
+
+    private fun save(s: AppSettings) {
+        prefs.edit().putString("settings_json", settingsJson(s).toString()).apply()
     }
 }
 
@@ -232,6 +256,19 @@ $foldersHtml
         return count
     }
 
+    /** Merges a restored list, keeping existing entries and skipping duplicates. */
+    fun mergeAll(items: List<Bookmark>): Int {
+        var added = 0
+        synchronized(this) {
+            val urls = bookmarks.map { it.url }.toMutableSet()
+            val fresh = items.filter { urls.add(it.url) }
+            added = fresh.size
+            if (fresh.isNotEmpty()) bookmarks = bookmarks + fresh
+        }
+        if (added > 0) persist()
+        return added
+    }
+
     /** Replaces the stored list, used by import with "replace" semantics. */
     fun replaceAll(items: List<Bookmark>) {
         synchronized(this) { bookmarks = items }
@@ -306,6 +343,21 @@ class HistoryRepository(
         if (query.isBlank()) return entries
         val q = query.lowercase()
         return entries.filter { it.title.lowercase().contains(q) || it.url.lowercase().contains(q) }
+    }
+
+    /** Merges restored entries, skipping ones already present. */
+    fun mergeAll(items: List<HistoryEntry>): Int {
+        var added = 0
+        synchronized(this) {
+            val ids = entries.map { it.id }.toMutableSet()
+            val fresh = items.filter { ids.add(it.id) }
+            added = fresh.size
+            if (fresh.isNotEmpty()) {
+                entries = (entries + fresh).sortedByDescending { it.visitedAt }.take(3000)
+            }
+        }
+        if (added > 0) persist()
+        return added
     }
 
     private fun persist() {

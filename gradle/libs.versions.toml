@@ -25,6 +25,9 @@ androidx-animation = { group = "androidx.compose.animation", name = "animation" 
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+# The Android SDK stubs org.json in local unit tests; the real implementation
+# lets JSON code be tested on the JVM.
+json = { group = "org.json", name = "json", version = "20240303" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
