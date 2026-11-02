@@ -10,19 +10,6 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
-### Fixed
-
-- Overlay open/close animations. The menu sheet, tab list and toast slide by
-  their own height over 180ms with the reference
-  `PathInterpolator(0.2, 0.2, 0.8, 0.8)`, with scrims that fade with the panel.
-  Exits are animated now: content stays composed until the leave animation
-  finishes instead of vanishing.
-- The title-bar Copy / Paste / Paste & Go popup runs the reference window
-  animation (`@anim/a` / `@anim/b`) in both directions: decelerating alpha
-  plus a 10% rise and a 0.9→1.0 scale on the platform bounce curve.
-- The site info panel dropped in with no animation; it now uses the mirrored
-  popup animation from the title bar.
-
 ### Changed
 
 - `dist/` is no longer committed; APKs are published through GitHub Releases.
