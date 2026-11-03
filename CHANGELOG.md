@@ -18,6 +18,12 @@ No user-facing changes.
 
 ### Fixed
 
+- The ripple animates and no longer flickers. Three separate defects: the
+  animation was read only inside the draw phase, which never schedules a
+  repaint; `NoIndication` compared by identity so Compose rebuilt the
+  clickable node on every recomposition; and the wash stopped short of the
+  control's edge. The wash now expands from the touch point across the whole
+  control and fades on release.
 - Dark mode now darkens pages the way Chromium intends: the engine's
   algorithmic darkening plus the page's own `prefers-color-scheme` theme,
   instead of overriding every element with `!important` colours (which erased

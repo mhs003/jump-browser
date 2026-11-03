@@ -1717,7 +1717,7 @@ fun JumpOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
             .height(43.dp)
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = com.jump.browser.ui.theme.ripple(color = com.jump.browser.ui.theme.JumpRipple),
+                indication = com.jump.browser.ui.theme.JumpRippleIndication,
                 onClick = onClick,
             ),
         verticalAlignment = Alignment.CenterVertically,

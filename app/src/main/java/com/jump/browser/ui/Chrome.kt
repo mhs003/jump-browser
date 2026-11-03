@@ -493,9 +493,7 @@ fun BottomBar(
                 .clip(RoundedCornerShape(18.dp))
                 .combinedClickable(
                     interactionSource = countInteraction,
-                    indication = com.jump.browser.ui.theme.ripple(
-                        color = com.jump.browser.ui.theme.JumpRipple,
-                    ),
+                    indication = com.jump.browser.ui.theme.JumpRippleIndication,
                     onClick = onTabs,
                     onLongClick = onNewTab,
                 ),
@@ -526,9 +524,7 @@ private fun androidx.compose.foundation.layout.RowScope.BottomSlot(
             .clip(RoundedCornerShape(18.dp))
             .combinedClickable(
                 interactionSource = interaction,
-                indication = com.jump.browser.ui.theme.ripple(
-                    color = com.jump.browser.ui.theme.JumpRipple,
-                ),
+                indication = com.jump.browser.ui.theme.JumpRippleIndication,
                 enabled = enabled,
                 onClick = onClick,
                 onLongClick = onLongClick,

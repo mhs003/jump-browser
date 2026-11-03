@@ -2,9 +2,7 @@ package com.jump.browser.ui.theme
 
 import android.app.Activity
 import android.os.Build
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.InteractionSource
@@ -14,6 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -23,6 +25,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -152,12 +157,33 @@ internal val DarkColors = JumpColorScheme(
 )
 
 /**
- * The reference ripple: a translucent grey disc that grows from the touch
- * point and fades out on release. Replaces `material3.ripple`, which drags the
- * whole Material ripple machinery into the APK.
+ * The reference ripple: a translucent grey wash that spreads from the touch
+ * point and fades out. Replaces `material3.ripple`, which pulls the whole
+ * Material ripple machinery into the APK.
+ *
+ * Two details make it behave correctly:
+ *
+ * - The animation is observed as snapshot state and the node invalidates its
+ *   draw every frame. Reading an `Animatable` only inside `draw()` does not
+ *   schedule repaints, so the ripple would appear once and freeze.
+ * - Instances compare equal across recompositions, so Compose reuses the node
+ *   instead of tearing it down mid-press (which shows up as a flicker on the
+ *   button).
  */
 fun ripple(color: Color = JumpRipple, bounded: Boolean = true): IndicationNodeFactory =
     RippleIndication(color, bounded)
+
+/**
+ * The two ripple variants used by the app.
+ *
+ * Hoisted to constants so the same instance is passed on every recomposition.
+ * A fresh instance per composition would still compare equal, but keeping one
+ * object removes any chance of Compose recreating the node mid-press.
+ */
+val JumpRippleIndication: IndicationNodeFactory = RippleIndication(JumpRipple, bounded = true)
+
+/** For controls that clip themselves, so the wash is not cut off. */
+val JumpRippleUnbounded: IndicationNodeFactory = RippleIndication(JumpRipple, bounded = false)
 
 private class RippleIndication(
     private val color: Color,
@@ -177,50 +203,83 @@ private class RippleNode(
     private val bounded: Boolean,
     private val source: InteractionSource,
 ) : Modifier.Node(), DrawModifierNode {
-    private val progress = Animatable(0f)
-    private var centre = Offset.Unspecified
+    /**
+     * Plain snapshot state, not an `Animatable`: `DrawModifierNode.draw` is not
+     * a snapshot-observed scope, so a value read there does not register a
+     * dependency or schedule another frame. Writing this state from the
+     * animation loop invalidates the draw on every step.
+     */
+    private var progress by mutableFloatStateOf(0f)
+    private var centre by mutableStateOf(Offset.Unspecified)
+    private var job: Job? = null
 
     override fun onAttach() {
         coroutineScope.launch {
             source.interactions.collect { interaction ->
-                if (interaction is PressInteraction.Press) {
-                    centre = interaction.pressPosition
-                    launch {
-                        progress.snapTo(0f)
-                        progress.animateTo(1f, tween(200, easing = FastOutSlowInEasing))
-                        progress.animateTo(0f, tween(220))
+                when (interaction) {
+                    is PressInteraction.Press -> {
+                        centre = interaction.pressPosition
+                        // A new press restarts cleanly instead of fighting the
+                        // previous animation.
+                        job?.cancel()
+                        job = launch { animateProgress(from = 0f, to = 1f, duration = 180) }
+                    }
+                    is PressInteraction.Release, is PressInteraction.Cancel -> {
+                        job?.cancel()
+                        val start = progress
+                        job = launch { animateProgress(from = start, to = 0f, duration = 160) }
                     }
                 }
             }
         }
     }
 
+    /** Steps [progress] in real time so each step invalidates the draw. */
+    private suspend fun animateProgress(from: Float, to: Float, duration: Int) {
+        val frames = (duration / 16).coerceAtLeast(1)
+        for (frame in 0..frames) {
+            val t = frame / frames.toFloat()
+            progress = from + (to - from) * FastOutSlowInEasing.transform(t)
+            delay(16)
+        }
+        progress = to
+    }
+
     override fun ContentDrawScope.draw() {
         drawContent()
-        val p = progress.value
+        val p = progress
         if (p <= 0.001f) return
-        val target = if (bounded) {
-            max(size.width, size.height)
+        val origin = if (centre == Offset.Unspecified) center else centre
+        // A backdrop-wash ripple: the disc grows to cover the whole control
+        // from wherever it was pressed. Using the farthest corner (rather than
+        // the longer side) is what makes the wash reach every edge.
+        val reach = if (bounded) {
+            val dx = max(origin.x, size.width - origin.x)
+            val dy = max(origin.y, size.height - origin.y)
+            hypot(dx, dy)
         } else {
             hypot(size.width, size.height)
         }
-        val origin = if (centre == Offset.Unspecified) center else centre
-        // Grow over the first 45% of the animation, then hold and fade.
-        val grow = (p / 0.45f).coerceAtMost(1f)
-        val fade = if (p <= 0.45f) 1f else ((1f - p) / 0.55f).coerceIn(0f, 1f)
-        drawCircle(
-            color = color.copy(alpha = color.alpha * fade),
-            radius = target * grow,
-            center = origin,
-        )
+        // Grows over the first 60% of the press animation, then holds; the
+        // release drives the same value back to zero, which fades the wash.
+        val grown = (p / 0.6f).coerceAtMost(1f)
+        drawCircle(color = color, radius = reach * grown, center = origin)
     }
+
 }
 
+/**
+ * An indication that draws nothing.
+ *
+ * Used where a control supplies its own feedback. It is a singleton whose
+ * equals is stable, so Compose never treats it as "changed" and rebuilds the
+ * clickable node underneath — which showed up as buttons flickering on press.
+ */
 private object NoIndication : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode =
         object : Modifier.Node() {}
 
-    override fun equals(other: Any?): Boolean = other === this
+    override fun equals(other: Any?): Boolean = other is NoIndication
     override fun hashCode(): Int = 0
 }
 

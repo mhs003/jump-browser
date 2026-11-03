@@ -190,7 +190,7 @@ fun Button(
             .background(if (enabled) colors.primary else colors.outlineVariant)
             .clickable(
                 enabled = enabled,
-                indication = ripple(bounded = true),
+                indication = JumpRippleIndication,
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = onClick,
             )
@@ -214,7 +214,7 @@ fun TextButton(
             .clip(RoundedCornerShape(18.dp))
             .clickable(
                 enabled = enabled,
-                indication = ripple(bounded = true),
+                indication = JumpRippleIndication,
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = onClick,
             )
@@ -262,7 +262,7 @@ fun Switch(
             .background(trackColor)
             .clickable(
                 enabled = enabled,
-                indication = ripple(bounded = false),
+                indication = JumpRippleUnbounded,
                 interactionSource = interactive,
             ) { onCheckedChange(!checked) },
         contentAlignment = Alignment.CenterStart,

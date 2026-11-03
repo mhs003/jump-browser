@@ -87,6 +87,7 @@ import com.jump.browser.browser.TabInfo
 import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.JumpPressed
 import com.jump.browser.ui.theme.JumpRipple
+import com.jump.browser.ui.theme.JumpRippleIndication
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -117,7 +118,7 @@ fun Modifier.jumpClickable(
         .clip(shape)
         .clickable(
             interactionSource = interaction,
-            indication = ripple(color = JumpRipple),
+            indication = JumpRippleIndication,
             enabled = enabled,
             onClick = onClick,
         )
@@ -194,7 +195,7 @@ fun Modifier.pressable(
         .clip(shape)
         .clickable(
             interactionSource = interaction,
-            indication = ripple(color = JumpRipple),
+            indication = JumpRippleIndication,
             enabled = enabled,
             onClick = onClick,
         )
