@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-03
+
 ### Fixed
 
 - The v1.2.1 packages did not install on some devices
