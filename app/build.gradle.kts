@@ -41,6 +41,10 @@ android {
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // The app is English-only; trimming the resource table keeps other
+        // locales' annotation tables out of resources.arsc.
+        resourceConfigurations += setOf("en")
+
         // The app ships its own JNI-free UI; the only native code comes from
         // CameraX and Compose. 32-bit x86 is emulator-only, so dropping it
         // removes ~114KB of libraries no real device loads.

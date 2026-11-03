@@ -17,3 +17,10 @@
 # blanket -dontwarn only silences optional integrations that are absent from
 # this dependency set.
 -dontwarn androidx.**
+
+# --- Size -----------------------------------------------------------------
+# Letting R8 relax access modifiers and repackage every class into one flat
+# namespace enables horizontal class merging and better inlining, which is
+# worth several percent of dex. Nothing here is reached reflectively.
+-allowaccessmodification
+-repackageclasses ''

@@ -10,6 +10,23 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Changed
+
+- Release APKs are recompressed with zopfli after the build (~50 KB on the
+  universal APK); CI repacks and re-signs the artifact before publishing.
+- R8 now mutates access modifiers and repackages all classes into one
+  namespace, enabling better merging and inlining (~40 KB).
+- The QR scanner decodes only QR codes: it drives zxing's QRCodeReader
+  directly instead of MultiFormatReader, which kept the DataMatrix, Aztec,
+  PDF417 and one-dimensional readers in the dex (~30 KB).
+- The resource table is built for English only.
+
+### Measured
+
+- arm64 release APK went from 1,404 KB (v1.2.0) to 1,242 KB before signing
+  and 1,251 KB signed; the published universal APK shrinks by the same
+  zopfli pass.
+
 ## [1.2.0] - 2026-11-03
 
 ### Added

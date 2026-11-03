@@ -144,6 +144,43 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # AGP deflates the dex at zlib level 9; zopfli finds a shorter DEFLATE
+      # stream for the same bytes, worth ~50 KB here. The repack strips the
+      # signature (and the signing block, which is not a zip record), so the
+      # APK is re-signed afterwards with the same key AGP used.
+      - name: Repack with zopfli and re-sign
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet zopfli
+          apk="app/build/outputs/apk/release/app-universal-release.apk"
+          [ -f "$apk" ] || { echo "::error::universal release APK not found"; exit 1; }
+          python3 scripts/repack_apk.py "$apk" "$apk.repacked"
+
+          if [ -f keystore.properties ]; then
+            # shellcheck disable=SC1091
+            ks="$(grep '^storeFile=' keystore.properties | cut -d= -f2-)"
+            pass="$(grep '^storePassword=' keystore.properties | cut -d= -f2-)"
+            alias="$(grep '^keyAlias=' keystore.properties | cut -d= -f2-)"
+            keypass="$(grep '^keyPassword=' keystore.properties | cut -d= -f2-)"
+          else
+            # Match AGP's debug-key fallback so the artifact stays installable.
+            ks="$HOME/.android/debug.keystore"
+            [ -f "$ks" ] || keytool -genkeypair -keystore "$ks" \
+              -storepass android -keypass android -alias androiddebugkey \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA -keysize 2048 -validity 10000
+            pass=android; alias=androiddebugkey; keypass=android
+          fi
+
+          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/lib/apksigner.jar | sort -V | tail -1)"
+          java -jar "$apksigner" sign \
+            --ks "$ks" --ks-pass pass:"$pass" --ks-key-alias "$alias" \
+            --key-pass pass:"$keypass" \
+            --out "$apk" "$apk.repacked"
+          java -jar "$apksigner" verify "$apk"
+          echo "Repacked and re-signed $(basename "$apk")"
+          sha256sum "$apk"
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4

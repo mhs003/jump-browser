@@ -44,10 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
-import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.jump.browser.ui.theme.Button
@@ -224,14 +222,10 @@ private class QrPreview(
     private var closed = false
     private var lastTextureSize: android.util.Size? = null
 
-    private val decoder = MultiFormatReader().apply {
-        setHints(
-            mapOf(
-                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
-                DecodeHintType.TRY_HARDER to true,
-            ),
-        )
-    }
+    // QR only: a direct reader keeps R8 from retaining the DataMatrix, Aztec,
+    // PDF417 and one-dimensional decoders that MultiFormatReader would drag in.
+    private val decoder = com.google.zxing.qrcode.QRCodeReader()
+    private val hints = java.util.Collections.singletonMap(DecodeHintType.TRY_HARDER, true)
 
     fun attach(texture: android.graphics.SurfaceTexture?) {
         if (texture == null) return
@@ -354,8 +348,7 @@ private class QrPreview(
         }
         val source = PlanarYUVLuminanceSource(data, width, height, 0, 0, width, height, false)
         val bitmap = BinaryBitmap(HybridBinarizer(source))
-        val result = runCatching { decoder.decodeWithState(bitmap) }.getOrNull() ?: return
-        runCatching { decoder.reset() }
+        val result = runCatching { decoder.decode(bitmap, hints) }.getOrNull() ?: return
         result.text?.takeIf { it.isNotBlank() }?.let(onDecoded)
     }
 
