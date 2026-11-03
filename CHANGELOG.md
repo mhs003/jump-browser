@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-03
+
 ### Fixed
 
 - Taps in the library pages' dead zones — between the Bookmarks/History/Saved
