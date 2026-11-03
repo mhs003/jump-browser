@@ -124,7 +124,7 @@ fun FindBar(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Surface(
-        modifier = Modifier.fillMaxWidth().height(40.dp),
+        modifier = Modifier.fillMaxWidth().height(40.dp).blockFallThrough(),
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp),
         shadowElevation = 0.dp,
@@ -178,6 +178,7 @@ fun ErrorPage(
         modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .blockFallThrough()
             .padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

@@ -10,6 +10,20 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- Taps in the library pages' dead zones — between the Bookmarks/History/Saved
+  pages tabs, between the bottom More and Edit buttons, or on empty panel
+  areas — fell through the panel and acted on the browser underneath (for
+  example they opened the homepage search field). Compose hands unhandled
+  pointer events to whatever draws behind an overlay, so every full-screen
+  surface — library pages, view source, the QR scanner, find-in-page, the
+  error page, the menu sheet and tab list panels and the full-screen address
+  bar — now consumes taps its own controls do not handle, and the dimmed
+  scrims no longer let drags scroll the page they cover.
+- The full-screen address bar could never open: the expand button reset the
+  edit state it needs to render, so expanding silently closed editing.
+
 ## [1.2.2] - 2026-11-03
 
 ### Fixed

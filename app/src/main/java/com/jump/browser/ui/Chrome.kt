@@ -359,6 +359,7 @@ fun FullScreenAddressBar(
         modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .blockFallThrough()
             .statusBarsPadding()
             .imePadding(),
     ) {
@@ -650,7 +651,7 @@ fun MenuOverlay(
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
-                ) { onDismiss() },
+                ) { android.util.Log.d("PF", "menu scrim onClick"); onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
             Box(
@@ -754,7 +755,10 @@ private fun MenuSheetContent(
             .fillMaxWidth()
             .height(214.dp)
             .clip(shape)
-            .border(1.dp, com.jump.browser.ui.theme.JumpPressed, shape),
+            .border(1.dp, com.jump.browser.ui.theme.JumpPressed, shape)
+            // Gaps between the owner of the sheet (its grid cells, the dot
+            // row) must not dismiss the sheet: keep them inside the panel.
+            .blockFallThrough(),
         color = MaterialTheme.colorScheme.surface,
         shape = shape,
         tonalElevation = 0.dp,
@@ -851,7 +855,8 @@ fun TabPopup(
                     Modifier
                         .fillMaxWidth()
                         .widthIn(max = 600.dp)
-                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .blockFallThrough(),
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     tonalElevation = 0.dp,

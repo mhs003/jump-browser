@@ -448,7 +448,13 @@ fun BrowserRoot(
                     onOpenAddress = { closeTabsOnly(); startAddressEditing() },
                     onCloseAddress = { closeEditing() },
                     onSubmitAddress = { submitAddress() },
-                    onExpandAddress = { closeAllOverlays(); fullScreenAddress = true },
+                    onExpandAddress = {
+                        closeAllOverlays()
+                        // The full-screen bar renders only while the edit
+                        // state is kept, which closeAllOverlays just reset.
+                        editing = true
+                        fullScreenAddress = true
+                    },
                     onLeftClick = { closeAllOverlays(); if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                     onRightClick = {
                         closeAllOverlays()
@@ -485,7 +491,13 @@ fun BrowserRoot(
                     onOpenAddress = { closeTabsOnly(); startAddressEditing() },
                     onCloseAddress = { closeEditing() },
                     onSubmitAddress = { submitAddress() },
-                    onExpandAddress = { closeAllOverlays(); fullScreenAddress = true },
+                    onExpandAddress = {
+                        closeAllOverlays()
+                        // The full-screen bar renders only while the edit
+                        // state is kept, which closeAllOverlays just reset.
+                        editing = true
+                        fullScreenAddress = true
+                    },
                     onLeftClick = { closeAllOverlays(); if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                     onRightClick = {
                         closeAllOverlays()
@@ -846,7 +858,10 @@ fun BrowserRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(140)),
         ) {
-            Surface(Modifier.fillMaxSize(), color = Color.Black) {
+            Surface(
+                Modifier.fillMaxSize().blockFallThrough(),
+                color = Color.Black,
+            ) {
                 QrScannerScreen(
                     onBack = { qrScreen = false },
                     onResult = { value ->
@@ -912,7 +927,11 @@ fun BrowserRoot(
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { translationX = screenWidthPx * (1f - pageProgress) },
+                    .graphicsLayer { translationX = screenWidthPx * (1f - pageProgress) }
+                    // Taps the library's own controls leave behind — in the
+                    // header gaps, between the bottom buttons, beside lists —
+                    // must not reach the browser column behind the panel.
+                    .blockFallThrough(),
                 color = MaterialTheme.colorScheme.background,
             ) {
                 when (shownPage) {
@@ -1030,7 +1049,10 @@ fun BrowserRoot(
             exit = slideOutHorizontally(tween(190)) { it / 4 } + fadeOut(tween(120)),
         ) {
             source?.let {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    Modifier.fillMaxSize().blockFallThrough(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
                     SourceScreen(it, sourceTitle) { source = null }
                 }
             }
@@ -1052,6 +1074,7 @@ fun BrowserRoot(
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.32f))
+                    .blockScrollThrough()
                     .clickable(
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,
@@ -1325,6 +1348,7 @@ private fun AddressScrim(visible: Boolean, onClick: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .background(JumpScrim)
+                .blockScrollThrough()
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
@@ -1538,6 +1562,7 @@ private fun ContextMenuOverlay(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.28f))
+                .blockScrollThrough()
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,

@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -64,6 +66,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -104,6 +107,50 @@ fun ChromeIcon(
         tint = tint,
         modifier = modifier.size(size.dp),
     )
+}
+
+/**
+ * Everything visible in the app is composed over the live browser surface,
+ * and Compose hands a pointer event to whatever draws behind an overlay when
+ * nothing in the overlay consumes it — a drawn background is not a touch
+ * boundary. Without this, a tap in a panel's padding, between its controls
+ * or above its empty list falls through into the page underneath and acts
+ * there. Node children decide first (the main pass dispatches descendants
+ * before ancestors), so buttons, rows and text fields inside the overlay
+ * keep working; only the leftovers die here.
+ */
+fun Modifier.blockFallThrough(): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        do {
+            val event = awaitPointerEvent()
+            event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+/**
+ * Scrim variant: a plain tap must still reach the scrim's own clickable for
+ * tap-to-dismiss, but drags must not scroll the page the scrim covers. Only
+ * movement past the touch slop is consumed, which a tap never reaches.
+ */
+fun Modifier.blockScrollThrough(): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        val slop = viewConfiguration.touchSlop
+        var distance = 0f
+        var pastSlop = false
+        do {
+            val event = awaitPointerEvent()
+            if (!pastSlop) {
+                distance += event.changes.fold(0f) { acc, change ->
+                    acc + change.positionChange().getDistance()
+                }
+                pastSlop = distance > slop
+            }
+            if (pastSlop) event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
+    }
 }
 
 @Composable
