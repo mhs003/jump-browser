@@ -158,8 +158,14 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
           set -euo pipefail
-          apk="app/build/outputs/apk/release/app-release.apk"
+          # ABI splits rename the per-architecture outputs, so pick the
+          # universal APK, which installs on every supported device.
+          apk="app/build/outputs/apk/release/app-universal-release.apk"
+          if [ ! -f "$apk" ]; then
+            apk="$(find app/build/outputs/apk/release -maxdepth 1 -name '*-release.apk' | head -1)"
+          fi
           [ -f "$apk" ] || { echo "::error::Release APK was not produced"; exit 1; }
+          echo "Publishing $(basename "$apk")"
           mkdir -p dist
           cp "$apk" "dist/Jump-$VERSION.apk"
           (cd dist && sha256sum "Jump-$VERSION.apk" > SHA256SUMS.txt)
