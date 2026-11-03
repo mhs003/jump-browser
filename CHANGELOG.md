@@ -10,6 +10,24 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Added
+
+- Long-pressing the home button focuses the address bar.
+
+### Changed
+
+- The tab list uses a smaller title (14sp) and tighter rows.
+- The tab list's overlay now covers only the page: the address bar and the
+  bottom bar stay live while it is open, and tapping either closes the sheet
+  and performs that control's normal action.
+
+### Fixed
+
+- Bottom bar and address bar buttons did nothing while the tab list was open.
+  The sheet's window filled the screen and claimed every touch; it is now
+  limited to the page area and marked not-touch-modal, so the chrome underneath
+  receives taps.
+
 ## [1.1.4] - 2026-11-03
 
 ### Fixed

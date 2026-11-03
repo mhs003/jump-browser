@@ -470,6 +470,7 @@ fun BottomBar(
     onMenu: () -> Unit,
     onMenuLong: () -> Unit,
     onBackLong: () -> Unit,
+    onHomeLong: () -> Unit,
     onForwardLong: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -484,7 +485,7 @@ fun BottomBar(
     ) {
         BottomSlot(ReferenceIcons.Back, "Go back", canBack, onBack, onBackLong)
         BottomSlot(ReferenceIcons.Forward, "Go forward", canForward, onForward, onForwardLong)
-        BottomSlot(ReferenceIcons.Home, "Home", true, onHome)
+        BottomSlot(ReferenceIcons.Home, "Home", true, onHome, onHomeLong)
         val countInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         Box(
             Modifier
@@ -741,15 +742,20 @@ fun TabPopup(
     onNewTab: () -> Unit,
     onDismiss: () -> Unit,
     bottomInset: Int,
+    topInset: Int,
 ) {
     if (!visible) return
-    // Same window and fade as the menu sheet.
-    SheetWindow(onDismiss = onDismiss) {
+    // The window itself is sized to the page area, so the scrim fills exactly
+    // that strip and the chrome above and below keeps receiving taps.
+    SheetWindow(
+        onDismiss = onDismiss,
+        contentTopPx = topInset,
+        contentBottomPx = bottomInset,
+    ) {
         val progress by rememberSheetProgress(visible)
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(bottom = with(LocalDensity.current) { bottomInset.toDp() })
                 .background(Color.Black.copy(alpha = 0.25f * progress))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -772,17 +778,17 @@ fun TabPopup(
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(48.dp)
+                                    .height(44.dp)
                                     .jumpClickable(androidx.compose.ui.graphics.RectangleShape) { onSelect(tab.id) },
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                                    Favicon(tab, 24)
+                                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                                    Favicon(tab, 20)
                                 }
                                 Text(
                                     text = tab.title.ifBlank { tab.url ?: "Homepage" },
                                     modifier = Modifier.weight(1f),
-                                    fontSize = 16.sp,
+                                    fontSize = 14.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     color = if (tab.id == activeId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,

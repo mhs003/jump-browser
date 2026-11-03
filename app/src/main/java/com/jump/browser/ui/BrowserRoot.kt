@@ -111,6 +111,9 @@ fun BrowserRoot(
     val density = LocalDensity.current
     val navInsetPx = WindowInsets.navigationBars.getBottom(density)
     val bottomInsetPx = navInsetPx + with(density) { 48.dp.roundToPx() }
+    // Where the page starts: status bar plus the address bar. The tab sheet's
+    // scrim stops here so the address bar stays tappable underneath it.
+    val topInsetPx = WindowInsets.statusBars.getTop(density) + with(density) { 48.dp.roundToPx() }
 
     var editing by remember { mutableStateOf(false) }
     var titleMenu by remember { mutableStateOf(false) }
@@ -252,6 +255,16 @@ fun BrowserRoot(
             if (immersive) hide(WindowInsetsCompat.Type.systemBars())
             else show(WindowInsetsCompat.Type.systemBars())
         }
+    }
+
+    /**
+     * Dismisses only the tab sheet.
+     *
+     * Used by the bottom bar and address bar, which stay live while the tab
+     * list is open: the tap both closes the sheet and performs its own action.
+     */
+    fun closeTabsOnly() {
+        showTabs = false
     }
 
     fun closeAllOverlays() {
@@ -416,17 +429,18 @@ fun BrowserRoot(
                     tab = active,
                     addressValue = address,
                     onAddressValueChange = { address = it },
-                    onOpenAddress = { startAddressEditing() },
+                    onOpenAddress = { closeTabsOnly(); startAddressEditing() },
                     onCloseAddress = { closeEditing() },
                     onSubmitAddress = { submitAddress() },
-                    onExpandAddress = { fullScreenAddress = true },
-                    onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                    onExpandAddress = { closeAllOverlays(); fullScreenAddress = true },
+                    onLeftClick = { closeAllOverlays(); if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                     onRightClick = {
+                        closeAllOverlays()
                         if (active?.isHome != false) qrScreen = true
                         else if (active?.loading == true) controller.stopLoading()
                         else controller.reload()
                     },
-                    onTitleLongClick = { titleMenu = true },
+                    onTitleLongClick = { closeAllOverlays(); titleMenu = true },
                     onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                 )
             }
@@ -437,17 +451,18 @@ fun BrowserRoot(
                     tab = active,
                     addressValue = address,
                     onAddressValueChange = { address = it },
-                    onOpenAddress = { startAddressEditing() },
+                    onOpenAddress = { closeTabsOnly(); startAddressEditing() },
                     onCloseAddress = { closeEditing() },
                     onSubmitAddress = { submitAddress() },
-                    onExpandAddress = { fullScreenAddress = true },
-                    onLeftClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                    onExpandAddress = { closeAllOverlays(); fullScreenAddress = true },
+                    onLeftClick = { closeAllOverlays(); if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                     onRightClick = {
+                        closeAllOverlays()
                         if (active?.isHome != false) qrScreen = true
                         else if (active?.loading == true) controller.stopLoading()
                         else controller.reload()
                     },
-                    onTitleLongClick = { titleMenu = true },
+                    onTitleLongClick = { closeAllOverlays(); titleMenu = true },
                     onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
                 )
             }
@@ -541,13 +556,14 @@ fun BrowserRoot(
                 BottomBar(
                     tab = active,
                     tabs = controller.tabs,
-                    onBack = { controller.goBack() },
-                    onForward = { controller.goForward() },
+                    onBack = { closeTabsOnly(); controller.goBack() },
+                    onForward = { closeTabsOnly(); controller.goForward() },
                     onHome = { closeAllOverlays(); controller.goHome() },
-                    onNewTab = { controller.newHomeTab() },
+                    onHomeLong = { closeAllOverlays(); startAddressEditing() },
+                    onNewTab = { closeTabsOnly(); controller.newHomeTab() },
                     onMenuLong = { openPage(LibraryPage.SETTINGS) },
-                    onBackLong = { controller.scrollToTop() },
-                    onForwardLong = { controller.scrollToBottom() },
+                    onBackLong = { closeTabsOnly(); controller.scrollToTop() },
+                    onForwardLong = { closeTabsOnly(); controller.scrollToBottom() },
                     onTabs = {
                         if (showTabs) showTabs = false
                         else {
@@ -570,13 +586,14 @@ fun BrowserRoot(
                     BottomBar(
                         tab = active,
                         tabs = controller.tabs,
-                        onBack = { controller.goBack() },
-                        onForward = { controller.goForward() },
+                        onBack = { closeTabsOnly(); controller.goBack() },
+                        onForward = { closeTabsOnly(); controller.goForward() },
                         onHome = { closeAllOverlays(); controller.goHome() },
-                        onNewTab = { controller.newHomeTab() },
+                        onHomeLong = { closeAllOverlays(); startAddressEditing() },
+                        onNewTab = { closeTabsOnly(); controller.newHomeTab() },
                         onMenuLong = { openPage(LibraryPage.SETTINGS) },
-                        onBackLong = { controller.scrollToTop() },
-                        onForwardLong = { controller.scrollToBottom() },
+                        onBackLong = { closeTabsOnly(); controller.scrollToTop() },
+                        onForwardLong = { closeTabsOnly(); controller.scrollToBottom() },
                         onTabs = {
                             if (showTabs) showTabs = false
                             else {
@@ -779,6 +796,7 @@ fun BrowserRoot(
             onNewTab = { controller.newHomeTab(); showTabs = false },
             onDismiss = { showTabs = false },
             bottomInset = bottomInsetPx,
+            topInset = topInsetPx,
         )
 
         AnimVis(
