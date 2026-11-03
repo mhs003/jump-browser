@@ -10,6 +10,11 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- Startup is consistently under a second again: the system download manager
+  query that ran on `onResume` had crept onto the launch path.
+
 ## [1.1.3] - 2026-11-03
 
 ### Changed
