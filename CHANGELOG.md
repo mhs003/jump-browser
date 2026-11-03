@@ -10,6 +10,45 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- Dark mode now darkens pages the way Chromium intends: the engine's
+  algorithmic darkening plus the page's own `prefers-color-scheme` theme,
+  instead of overriding every element with `!important` colours (which erased
+  images and broke layouts on real sites).
+- Turning Night mode off from the bottom sheet now switches both the chrome
+  and the page back to light; the setting was applied before the state it read
+  had been updated.
+- "Ask AI about this page" and the AI settings dialog no longer crash: a
+  scroll container was nested inside the dialog's own scroll region.
+- New scripts are kept when added while the stored list is still loading.
+
+### Added
+
+- Userscripts: `==UserScript==` metadata parsing, `@match`/`@exclude`
+  patterns, enable/disable and delete, run at document start and finish.
+- Password manager: logins encrypted with the Android keystore, offered for
+  saving after a sign-in form submits and filled automatically.
+- Bookmark import and export in the standard `bookmarks.html` format, keeping
+  folders.
+- Full data backup and restore (settings, bookmarks, history; passwords are
+  deliberately excluded).
+- AI assistant: any OpenAI-compatible endpoint can be configured, and Tools ->
+  "Ask AI about this page" summarises the current page.
+- Orientation control: follow system, portrait, landscape or auto-rotate.
+- A real Sync page explaining the local-only model instead of a dead row.
+
+### Changed
+
+- Release APK is 1.4 MB, down from 2.25 MB: QR scanning moved from CameraX to
+  Camera2 (removing four AARs and their native libraries), Material3 replaced
+  by a small local theme and ripple, unused tooling removed, x86 dropped,
+  packaging noise excluded, and per-ABI splits.
+- Cold start is ~0.6 s (from ~3 s): repositories load lazily, history and
+  bookmarks parse off the main thread, ad blocking does set lookups instead of
+  scanning every host, in-flight request tracking is bounded, and icons go
+  through a downsampling cache instead of decoding during composition.
+
 ## [1.0.6] - 2026-11-02
 
 No user-facing changes.
