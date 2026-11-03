@@ -86,6 +86,16 @@ android {
             // so keep the dex deflated.
             useLegacyPackaging = true
         }
+        jniLibs {
+            // Extract native libraries at install time instead of mapping them
+            // from the APK. Uncompressed, page-aligned libraries put hard
+            // alignment constraints on every zip tool in the chain, and a
+            // repack step that moved entries was rejected by some installers
+            // ("Failed to extract native libraries"). Extracted libraries have
+            // no alignment requirement, work on every ROM, and can be
+            // compressed — worth more than the mmap overhead for a 10 KB lib.
+            useLegacyPackaging = true
+        }
     }
 
     signingConfigs {

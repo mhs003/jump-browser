@@ -10,6 +10,17 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- The v1.2.1 packages did not install on some devices
+  (`INSTALL_FAILED_INVALID_APK: Failed to extract native libraries`): the
+  repack step moved zip entries, and the native libraries' alignment
+  padding no longer matched after re-signing. Libraries are now extracted
+  at install time (extractNativeLibs) instead of being mapped from the APK,
+  which removes the alignment requirement entirely and keeps them
+  compressible. `resources.arsc` stays stored, uncompressed and 4-byte
+  aligned, as Android requires of apps targeting API 30+.
+
 ## [1.2.1] - 2026-11-03
 
 ### Changed
