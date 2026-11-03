@@ -14,7 +14,14 @@ workflow refuses to publish otherwise.
 
 ### Changed
 
-- Maintenance release: build, tooling and dependency updates only.
+- The press indicator inside dialogs and lists is the steady grey highlight
+  throughout, matching the rest of the chrome.
+
+### Fixed
+
+- Release notes can no longer ship empty: `scripts/release.sh` refuses to cut
+  a release while `CHANGELOG.md` has nothing under `[Unreleased]`, and both CI
+  and the release job reject an empty version section.
 
 ## [1.1.2] - 2026-11-03
 

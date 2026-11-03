@@ -57,7 +57,16 @@ jobs:
             exit 0
           fi
           if [ "$prev" -ge "$now" ]; then
-            echo "::error::versionCode did not increase ($prev -> $now). Run scripts/bump-version.sh <patch|minor|major> before pushing."
+            # Some pushes legitimately ship no new app build: fixing the
+            # release tooling, workflows or docs carries no user-facing change.
+            subject="$(git log -1 --pretty=%s)"
+            case "$subject" in
+              "chore(release): "*|"ci(release): "*|"docs(release): "*)
+                echo "no bump needed for '$subject'"
+                exit 0
+                ;;
+            esac
+            echo "::error::versionCode did not increase ($prev -> $now). Run scripts/bump-version.sh <patch|minor|major> before pushing, or mark the commit ci(release):/docs(release):."
             exit 1
           fi
           echo "versionCode $prev -> $now"

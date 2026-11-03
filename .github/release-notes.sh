@@ -8,4 +8,4 @@ awk -v v="$version" '
   $0 ~ "^## \\[" v "\\]" { found = 1; next }
   found && /^## \[/ { exit }
   found { print }
-' CHANGELOG.md | sed -e '${/^$/d;}'
+' CHANGELOG.md | sed -e '1{/^$/d;}' -e '${/^$/d;}'
