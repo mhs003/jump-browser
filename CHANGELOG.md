@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-11-04
+
 ### Changed
 
 - The find-in-page bar now rides directly on the keyboard while typing and
