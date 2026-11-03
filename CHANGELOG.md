@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-03
+
 ### Changed
 
 - Release APKs are recompressed with zopfli after the build (~50 KB on the
