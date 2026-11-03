@@ -46,8 +46,18 @@ class SettingsRepository(private val context: Context) {
                 homepageFavoriteColor = o.optBoolean("homepageFavoriteColor", defaults.homepageFavoriteColor),
                 toolbarPosition = o.optString("toolbarPosition", defaults.toolbarPosition),
                 userAgent = o.optString("userAgent", defaults.userAgent),
-                toolbarLayout = o.optString("toolbarLayout", defaults.toolbarLayout),
-                toolbarSearch = o.optBoolean("toolbarSearch", defaults.toolbarSearch),
+                urlFieldContent = o.optString("urlFieldContent", defaults.urlFieldContent),
+                showTabBar = o.optBoolean("showTabBar", defaults.showTabBar),
+                autoHideToolbars = o.optString("autoHideToolbars", defaults.autoHideToolbars),
+                searchToolbar = o.optBoolean("searchToolbar", defaults.searchToolbar),
+                toolbarColor = o.optString("toolbarColor", defaults.toolbarColor),
+                autoAdjustToolbarColor = o.optBoolean("autoAdjustToolbarColor", defaults.autoAdjustToolbarColor),
+                customUserAgent = o.optString("customUserAgent", defaults.customUserAgent),
+                desktopUserAgent = o.optString("desktopUserAgent", defaults.desktopUserAgent),
+                userAgentReduction = o.optBoolean("userAgentReduction", defaults.userAgentReduction),
+                clearDataMask = o.optInt("clearDataMask", defaults.clearDataMask),
+                clearDataOnExitMask = o.optInt("clearDataOnExitMask", defaults.clearDataOnExitMask),
+                showUndoToast = o.optBoolean("showUndoToast", defaults.showUndoToast),
                 customizeMenu = runCatching {
                     val arr = o.optJSONArray("customizeMenu") ?: return@runCatching emptyList<String>()
                     (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotEmpty() }
@@ -112,8 +122,18 @@ class SettingsRepository(private val context: Context) {
             .put("homepageFavoriteColor", s.homepageFavoriteColor)
             .put("toolbarPosition", s.toolbarPosition)
             .put("userAgent", s.userAgent)
-            .put("toolbarLayout", s.toolbarLayout)
-            .put("toolbarSearch", s.toolbarSearch)
+            .put("urlFieldContent", s.urlFieldContent)
+            .put("showTabBar", s.showTabBar)
+            .put("autoHideToolbars", s.autoHideToolbars)
+            .put("searchToolbar", s.searchToolbar)
+            .put("toolbarColor", s.toolbarColor)
+            .put("autoAdjustToolbarColor", s.autoAdjustToolbarColor)
+            .put("customUserAgent", s.customUserAgent)
+            .put("desktopUserAgent", s.desktopUserAgent)
+            .put("userAgentReduction", s.userAgentReduction)
+            .put("clearDataMask", s.clearDataMask)
+            .put("clearDataOnExitMask", s.clearDataOnExitMask)
+            .put("showUndoToast", s.showUndoToast)
             .put("customizeMenu", org.json.JSONArray(s.customizeMenu))
             .put("customSearchUrl", s.customSearchUrl)
             .put("homepageUrl", s.homepageUrl)

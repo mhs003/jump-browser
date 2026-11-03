@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -91,6 +92,7 @@ import com.jump.browser.data.DownloadState
 import com.jump.browser.data.DownloadTask
 import com.jump.browser.data.HistoryEntry
 import com.jump.browser.data.SearchEngine
+import com.jump.browser.browser.UserAgents
 import com.jump.browser.ui.theme.JumpAccent
 import com.jump.browser.ui.theme.LinearProgressIndicator
 import com.jump.browser.ui.theme.Button
@@ -763,6 +765,8 @@ fun SettingsScreen(
     onClearLogins: () -> Unit = {},
     onExportData: () -> Unit = {},
     onImportData: () -> Unit = {},
+    /** Toggles incognito mode for the whole browser, not just one tab. */
+    controllerSetIncognito: ((Boolean) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var category by remember { mutableStateOf<String?>(null) }
@@ -771,6 +775,9 @@ fun SettingsScreen(
     var homepageDraft by remember { mutableStateOf(settings.homepageUrl) }
     var customSearchDraft by remember { mutableStateOf(settings.customSearchUrl) }
     var backgroundDraft by remember { mutableIntStateOf(settings.homepageBackgroundOpacity) }
+    // Clear data selections are edited in the dialog and only saved on confirm.
+    var clearDraft by remember { mutableIntStateOf(settings.clearDataMask) }
+    var exitMaskDraft by remember { mutableIntStateOf(settings.clearDataOnExitMask) }
 
     fun toast(text: String) = JumpToast.show(context, text)
 
@@ -805,85 +812,89 @@ fun SettingsScreen(
                 }
             }
             "General" -> {
+                // Via's Settings is one flat list whose first group is General.
+                // The order here follows its list exactly so the screen reads
+                // the same: General, then the toolbars and appearance group,
+                // then gestures and data.
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 13.dp)) {
-                    item { SettingsLabelRow("Sync", "Local only") { dialog = "sync" } }
-                    item { SettingsLabelRow("User-agent", activeUserAgentLabel(settings.desktopMode)) { dialog = "userAgent" } }
-                    item { SettingsLabelRow("Clear data") { dialog = "clear" } }
+                    item { SettingsLabelRow(
+                        "Incognito mode",
+                        if (settings.incognitoDefault) "On" else "Off",
+                    ) {
+                        // The controller owns this flag: it also converts the
+                        // open tabs, so the transform here would be a second,
+                        // competing write.
+                        controllerSetIncognito?.invoke(!settings.incognitoDefault)
+                    } }
+                    item { SettingsLabelRow("User-agent", UserAgents.label(settings)) { dialog = "userAgent" } }
+                    item { SettingsLabelRow("Clear data") { clearDraft = settings.clearDataMask; dialog = "clear" } }
                     item { SettingsLabelRow("Ad blocking", if (settings.adBlock) null else "Off") {
                         onSettingsChange { it.copy(adBlock = !it.adBlock) }
                     } }
-                    item { SettingsLabelRow("Site configuration", exceptionsSummary()) { toast("Saved site exceptions: ${exceptionsSummary()}") } }
-                    item { SettingsLabelRow(
-                        "Save passwords",
-                        if (settings.savePasswords) "On" else "Off",
-                    ) {
-                        onSettingsChange { it.copy(savePasswords = !it.savePasswords) }
+                    item { SettingsLabelRow("Site configuration", exceptionsSummary()) {
+                        toast("No per-site exceptions yet")
                     } }
-                    item { SettingsLabelRow(
-                        "Password manager",
-                        if (logins.isEmpty()) "No saved passwords"
-                        else "${logins.size} saved",
-                    ) { dialog = "passwords" } }
+                    item { SettingsLabelRow("Password manager", if (logins.isEmpty()) null else "${logins.size} saved") {
+                        dialog = "passwords"
+                    } }
                     item { SettingsLabelRow("Night mode", if (settings.nightMode) "On" else null) {
                         onSettingsChange { it.copy(nightMode = !it.nightMode) }
                     } }
-                    item { SettingsLabelRow("Appearance", when (settings.darkMode) {
-                        DarkMode.SYSTEM -> "Follow system"
-                        DarkMode.LIGHT -> null
-                        DarkMode.DARK -> "Dark"
-                    }) { dialog = "theme" } }
                     item { SettingsLabelRow("Reader mode", if (settings.readerMode) "On" else null) {
                         onSettingsChange { it.copy(readerMode = !it.readerMode) }
                     } }
                     item { SettingsLabelRow("Toolbars settings") { dialog = "toolbars" } }
                     item { SettingsLabelRow("Customize menu") { dialog = "customizeMenu" } }
-                    item { SettingsLabelRow("Customize context menu") { toast("Context menu customization is not available") } }
-                    item { SettingsLabelRow("Language", "System") { toast("Language follows Android") } }
+                    item { SettingsLabelRow("Customize context menu") {
+                        toast("Context menu customization is not available yet")
+                    } }
+                    item { SettingsLabelRow("Language", "System") { dialog = "language" } }
                     item { SettingsLabelRow("Homepage", settings.homepageUrl.ifBlank { null }) {
                         homepageDraft = settings.homepageUrl; dialog = "homepage"
                     } }
-                    item { SettingsLabelRow("Search settings", if (settings.searchEngineId == "google") null else settings.searchEngine.name) { dialog = "engine" } }
-                    if (settings.searchEngineId == "custom") {
-                        item { SettingsLabelRow("Custom search URL", settings.customSearchUrl.ifBlank { "Not set" }) {
-                            customSearchDraft = settings.customSearchUrl; dialog = "customSearch"
-                        } }
-                    }
+                    item { SettingsLabelRow("Search settings", if (settings.searchEngineId == "google") null else settings.searchEngine.name) {
+                        dialog = "engine"
+                    } }
                     item { SettingsLabelRow(
                         "AI settings",
-                        when {
-                            settings.ai.baseUrl.isBlank() -> "Not configured"
-                            else -> settings.ai.model.ifBlank { "Endpoint set" }
-                        },
+                        if (settings.ai.baseUrl.isBlank()) "Not configured" else settings.ai.model.ifBlank { "Endpoint set" },
                     ) { dialog = "ai" } }
-                    item {
-                        SettingsLabelRow(
-                            "Orientation",
-                            when (settings.orientation) {
-                                "portrait" -> "Portrait"
-                                "landscape" -> "Landscape"
-                                "sensor" -> "Auto-rotate"
-                                else -> null
-                            },
-                        ) { dialog = "orientation" }
-                    }
-                    item { SettingsLabelRow("Download location") { toast("Public Downloads folder") } }
-                    item { SettingsLabelRow("Download manager") { toast("Android DownloadManager") } }
-                    item { SettingsLabelRow("External video player") { toast("Videos open in the system player") } }
-                    item { SettingsLabelRow("Clear data on exit", "Off") { toast("Browsing data is kept on exit") } }
-                    item { SettingsLabelRow("Font", if (settings.textZoom == 100) null else "${settings.textZoom}%") { dialog = "zoom" } }
-                    item { SettingsLabelRow("Gestures") { toast("Gesture settings are not available") } }
-                    item {
-                        SettingsLabelRow("Import bookmarks") { dialog = "importBookmarks" }
-                    }
-                    item {
-                        SettingsLabelRow("Export bookmarks") { dialog = "exportBookmarks" }
-                    }
+                    item { SettingsLabelRow("Orientation", when (settings.orientation) {
+                        "portrait" -> "Portrait"
+                        "landscape" -> "Landscape"
+                        "sensor" -> "Auto-rotate"
+                        else -> null
+                    }) { dialog = "orientation" } }
+                    item { SettingsLabelRow("Download location", "Public Downloads folder") {
+                        toast("Downloads are saved to the public Downloads folder")
+                    } }
+                    item { SettingsLabelRow("Font", if (settings.textZoom == 100) null else "${settings.textZoom}%") {
+                        dialog = "zoom"
+                    } }
+                    item { SettingsLabelRow("Gestures") { toast("Gestures use the platform defaults") } }
+
+                    item { SettingsSectionHeader("Data") }
+                    item { SettingsLabelRow(
+                        "Clear data on exit",
+                        clearMaskSummary(settings.clearDataOnExitMask),
+                    ) { exitMaskDraft = settings.clearDataOnExitMask; dialog = "clearOnExit" } }
+                    item { SettingsLabelRow(
+                        "Restore tabs on startup",
+                        if (settings.restoreTabs) "Always restore" else "Don't restore",
+                    ) { dialog = "restoreTabs" } }
+                    item { SettingsLabelRow(
+                        title = "Show toast to undo closing tab",
+                        subtitle = if (settings.incognitoDefault) {
+                            "The toast will not be shown in incognito mode"
+                        } else null,
+                    ) { onSettingsChange { it.copy(showUndoToast = !it.showUndoToast) } } }
+                    item { SettingsLabelRow("Import bookmarks") { dialog = "importBookmarks" } }
+                    item { SettingsLabelRow("Export bookmarks") { dialog = "exportBookmarks" } }
                     item { SettingsLabelRow("Import data") { dialog = "importData" } }
                     item { SettingsLabelRow("Export data") { dialog = "exportData" } }
-                    item { SettingsLabelRow("Restore tabs on startup", if (settings.restoreTabs) null else "Off") {
-                        onSettingsChange { it.copy(restoreTabs = !it.restoreTabs) }
+                    item { SettingsLabelRow("Set as default browser") {
+                        openDefaultBrowserSettings(context)
                     } }
-                    item { SettingsLabelRow("Set as default browser") { toast("Set Jump as the default browser in Android settings") } }
                     item { Spacer(Modifier.height(24.dp)) }
                 }
             }
@@ -1225,22 +1236,100 @@ fun SettingsScreen(
         )
     }
     if (dialog == "userAgent") {
+        // Via's User-agent page: a round-trip preview at the top, a "Custom"
+        // entry that accepts any string, a desktop-mode agent and the
+        // reduction switch. The agent is what gets sent; the desktop site
+        // toggle stays a per-tab switch, exactly as in Via.
+        var draft by remember { mutableStateOf(settings.userAgent) }
+        var customDraft by remember { mutableStateOf(settings.customUserAgent) }
+        var desktopDraft by remember { mutableStateOf(settings.desktopUserAgent) }
         val options = listOf(
-            "Default" to "MOBILE",
-            "Desktop" to "DESKTOP",
-            "Android" to "ANDROID",
+            "Default" to "DEFAULT",
+            "Android (Phone)" to "ANDROID",
+            "Android (Tablet)" to "ANDROID_TABLET",
+            "Chrome (PC)" to "WINDOWS_CHROME",
+            "Windows (IE 11)" to "WINDOWS_IE",
+            "macOS" to "MACOS",
             "iPhone" to "IPHONE",
+            "iPad" to "IPAD",
+            "Symbian" to "SYMBIAN",
             "Custom" to "CUSTOM",
         )
-        ChoiceDialog(
-            title = "User-agent",
-            options = options,
-            selected = settings.userAgent.ifBlank { "MOBILE" },
-            onDismiss = { dialog = null },
-            onSelect = { value ->
-                onSettingsChange { it.copy(userAgent = value, desktopMode = value == "DESKTOP") }
-                dialog = null
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("User-agent") },
+            text = {
+                Column {
+                    options.forEach { (label, value) ->
+                        JumpOptionRow(label, draft == value) {
+                            draft = value
+                            if (value != "CUSTOM") {
+                                onSettingsChange { it.copy(userAgent = value) }
+                            } else {
+                                onSettingsChange { it.copy(userAgent = "CUSTOM") }
+                            }
+                        }
+                    }
+                    if (draft == "CUSTOM") {
+                        Spacer(Modifier.height(10.dp))
+                        JumpTextField(
+                            value = customDraft,
+                            onValueChange = { customDraft = it },
+                            placeholder = "Custom user-agent",
+                            keyboardType = KeyboardType.Text,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    JumpOptionRow("User-agent in desktop mode", settings.desktopUserAgent.isNotBlank()) {
+                        desktopDraft = if (desktopDraft.isNotBlank()) "" else UserAgents.DESKTOP
+                    }
+                    if (settings.desktopUserAgent.isNotBlank()) {
+                        JumpTextField(
+                            value = desktopDraft,
+                            onValueChange = { desktopDraft = it },
+                            placeholder = UserAgents.DESKTOP,
+                            keyboardType = KeyboardType.Text,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().pressable {
+                            onSettingsChange { it.copy(userAgentReduction = !it.userAgentReduction) }
+                        }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("User-agent reduction", fontSize = 15.sp)
+                            Text(
+                                "Remove device information and minor version information from User-agent",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        com.jump.browser.ui.theme.Switch(
+                            checked = settings.userAgentReduction,
+                            onCheckedChange = { onSettingsChange { s -> s.copy(userAgentReduction = it) } },
+                        )
+                    }
+                }
             },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    if (draft == "CUSTOM" && customDraft.isBlank()) {
+                        toast("The user-agent can not be empty")
+                        return@JumpDialogButton
+                    }
+                    onSettingsChange {
+                        it.copy(
+                            userAgent = draft,
+                            customUserAgent = customDraft.trim(),
+                            desktopUserAgent = desktopDraft.trim(),
+                        )
+                    }
+                    dialog = null
+                }) { Text("Save") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
     }
     if (dialog == "customizeMenu") {
@@ -1296,35 +1385,103 @@ fun SettingsScreen(
         )
     }
     if (dialog == "toolbars") {
+        // Via's Toolbars settings page, in its order. A row opens its chooser
+        // in place, and picking an option applies it to the live chrome
+        // immediately, so the change is visible as soon as the page closes.
+        var pickerTitle by remember { mutableStateOf<String?>(null) }
+        var pickerOptions by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+        var pickerApply by remember { mutableStateOf<(String) -> Unit>({}) }
+
+        fun openPicker(title: String, options: List<Pair<String, String>>, apply: (String) -> Unit) {
+            pickerTitle = title
+            pickerOptions = options
+            pickerApply = apply
+        }
+
         JumpAlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Toolbars") },
+            title = { Text("Toolbars settings") },
             text = {
-                Column {
-                    JumpOptionRow(
-                        label = "Address bar on top",
-                        selected = settings.toolbarPosition == "TOP",
-                    ) { onSettingsChange { it.copy(toolbarPosition = "TOP") }; dialog = null }
-                    JumpOptionRow(
-                        label = "Address bar and toolbar below",
-                        selected = settings.toolbarPosition == "BOTTOM",
-                    ) { onSettingsChange { it.copy(toolbarPosition = "BOTTOM") }; dialog = null }
-                    JumpOptionRow(
-                        label = "Slim address bar",
-                        selected = settings.toolbarLayout == "SLIM",
-                    ) {
-                        onSettingsChange {
-                            it.copy(
-                                toolbarLayout = "SLIM",
-                                toolbarPosition = "BOTTOM",
-                                toolbarSearch = false,
-                            )
-                        }
-                        dialog = null
+        Column {
+            ToolbarChoiceRow(
+                label = "Toolbar UI mode",
+                value = when (settings.toolbarPosition) {
+                    "BOTTOM" -> "Toolbar at bottom"
+                    "TWO_ROW" -> "Two-row toolbar"
+                    "SANDWICH" -> "Sandwich"
+                    else -> "Toolbar at top"
+                },
+            ) {
+                openPicker(
+                    "Toolbar UI mode",
+                    listOf(
+                        "Sandwich" to "SANDWICH",
+                        "Toolbar at top" to "TOP",
+                        "Toolbar at bottom" to "BOTTOM",
+                        "Two-row toolbar" to "TWO_ROW",
+                    ),
+                ) { value -> onSettingsChange { it.copy(toolbarPosition = value) } }
+            }
+            ToolbarChoiceRow("Auto-hide toolbars", when (settings.autoHideToolbars) {
+                "SCROLL" -> "Scroll to hide/show"
+                "PRESS" -> "Press to hide/show"
+                else -> "Always show"
+            }) {
+                openPicker(
+                    "Auto-hide toolbars",
+                    listOf(
+                        "Always show" to "NEVER",
+                        "Scroll to hide/show" to "SCROLL",
+                        "Press to hide/show" to "PRESS",
+                    ),
+                ) { value -> onSettingsChange { it.copy(autoHideToolbars = value) } }
+            }
+            ToolbarChoiceRow("Enable tab bar", if (settings.showTabBar) "On" else "Off") {
+                onSettingsChange { it.copy(showTabBar = !it.showTabBar) }
+            }
+            ToolbarChoiceRow("URL field content", when (settings.urlFieldContent) {
+                "URL" -> "URL"
+                "DOMAIN" -> "Domain"
+                else -> "Title"
+            }) {
+                openPicker(
+                    "URL field content",
+                    listOf("Title" to "TITLE", "URL" to "URL", "Domain" to "DOMAIN"),
+                ) { value -> onSettingsChange { it.copy(urlFieldContent = value) } }
+            }
+            ToolbarChoiceRow("Color mode", when (settings.toolbarColor) {
+                "DARK" -> "Dark"
+                "LIGHT" -> "Light"
+                else -> "Auto"
+            }) {
+                openPicker(
+                    "Color mode",
+                    listOf("Auto" to "AUTO", "Light" to "LIGHT", "Dark" to "DARK"),
+                ) { value -> onSettingsChange { it.copy(toolbarColor = value) } }
+            }
+            ToolbarChoiceRow(
+                "Auto-adjust color of toolbars",
+                if (settings.autoAdjustToolbarColor) "On" else "Off",
+            ) { onSettingsChange { it.copy(autoAdjustToolbarColor = !it.autoAdjustToolbarColor) } }
+
+            pickerTitle?.let { title ->
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    title,
+                    modifier = Modifier.padding(horizontal = 2.dp, vertical = 6.dp),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                pickerOptions.forEach { (label, value) ->
+                    JumpOptionRow(label, selected = false) {
+                        pickerApply(value)
+                        pickerTitle = null
                     }
                 }
+            }
+        }
             },
-            confirmButton = {},
+            confirmButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Done") } },
         )
     }
     if (dialog == "orientation") {
@@ -1632,15 +1789,176 @@ fun SettingsScreen(
         )
     }
     if (dialog == "clear") {
+        // Via's Clear data dialog: a multi-choice list with Cache and App
+        // cache pre-ticked. Only the ticked categories are wiped.
         JumpAlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Clear browsing data?") },
-            text = { Text("This clears history, cookies and the page cache. Bookmarks and downloads are kept.") },
+            title = { Text("Clear data") },
+            text = {
+                Column {
+                    com.jump.browser.browser.CLEAR_DATA_OPTIONS.forEach { (label, flag) ->
+                        ClearDataCheckRow(
+                            label = label,
+                            checked = clearDraft and flag != 0,
+                            onToggle = {
+                                clearDraft = if (clearDraft and flag != 0) clearDraft and flag.inv() else clearDraft or flag
+                            },
+                        )
+                    }
+                }
+            },
             confirmButton = {
-                JumpDialogButton(onClick = { dialog = null; onClearData() }) { Text("Clear") }
+                JumpDialogButton(onClick = {
+                    val mask = clearDraft
+                    onSettingsChange { it.copy(clearDataMask = mask) }
+                    clearDraft = mask
+                    dialog = null
+                    onClearData()
+                }) { Text("Clear") }
             },
             dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
+    }
+    if (dialog == "clearOnExit") {
+        // The same option list, but stored as the mask applied on exit. All
+        // boxes start clear, which is Via's "never clear" default.
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Clear data on exit") },
+            text = {
+                Column {
+                    com.jump.browser.browser.CLEAR_DATA_OPTIONS.forEach { (label, flag) ->
+                        ClearDataCheckRow(
+                            label = label,
+                            checked = exitMaskDraft and flag != 0,
+                            onToggle = {
+                                exitMaskDraft = if (exitMaskDraft and flag != 0) {
+                                    exitMaskDraft and flag.inv()
+                                } else {
+                                    exitMaskDraft or flag
+                                }
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    val mask = exitMaskDraft
+                    onSettingsChange { it.copy(clearDataOnExitMask = mask) }
+                    dialog = null
+                }) { Text("Save") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+    if (dialog == "restoreTabs") {
+        ChoiceDialog(
+            title = "Restore tabs on startup",
+            options = listOf("Don't restore" to "NEVER", "Always restore" to "ALWAYS"),
+            selected = if (settings.restoreTabs) "ALWAYS" else "NEVER",
+            onDismiss = { dialog = null },
+            onSelect = { value ->
+                onSettingsChange { it.copy(restoreTabs = value == "ALWAYS") }
+                dialog = null
+            },
+        )
+    }
+    if (dialog == "language") {
+        JumpAlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Language") },
+            text = {
+                Text("Jump follows the system language. Open Android Settings to change it for the whole device.")
+            },
+            confirmButton = {
+                JumpDialogButton(onClick = {
+                    dialog = null
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                }) { Text("Open settings") }
+            },
+            dismissButton = { JumpDialogButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** A hint beside a settings row, matching the reference's secondary text. */
+@Composable
+private fun SettingsSectionCaption(text: String) {
+    Text(
+        text,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        fontSize = 12.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** A row of the Toolbars settings page: label on the left, value on the right. */
+@Composable
+private fun ToolbarChoiceRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressable { onClick() }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f), fontSize = 15.sp)
+        Text(value, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** A checkbox row in the Clear data dialogs. */
+@Composable
+private fun ClearDataCheckRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressable { onToggle() }
+            .padding(vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(18.dp)
+                .border(
+                    width = 1.5.dp,
+                    color = if (checked) JumpAccent else MaterialTheme.colorScheme.outline,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp),
+                )
+                .background(
+                    if (checked) JumpAccent else Color.Transparent,
+                    androidx.compose.foundation.shape.RoundedCornerShape(3.dp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                Canvas(Modifier.size(13.dp)) {
+                    val stroke = size.minDimension * 0.16f
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(size.width * 0.12f, size.height * 0.52f)
+                        lineTo(size.width * 0.4f, size.height * 0.8f)
+                        lineTo(size.width * 0.9f, size.height * 0.2f)
+                    }
+                    drawPath(
+                        path,
+                        color = Color.White,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = stroke,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                        ),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Text(label, fontSize = 15.sp)
     }
 }
 
@@ -2047,6 +2365,41 @@ private fun pickHomepageImage(context: android.content.Context, onPicked: (Strin
     }
 }
 
+
+/** Via's group caption inside a settings list. */
+@Composable
+private fun SettingsSectionHeader(text: String) {
+    Text(
+        text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 6.dp),
+        fontSize = 13.sp,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+/** Summarises a Clear data mask the way Via does: "All" or a count. */
+private fun clearMaskSummary(mask: Int): String {
+    if (mask == 0) return "Off"
+    val options = com.jump.browser.browser.CLEAR_DATA_OPTIONS
+    val chosen = options.count { mask and it.second != 0 }
+    return when {
+        chosen == options.size -> "All"
+        chosen == 1 -> options.first { mask and it.second != 0 }.first
+        else -> "$chosen items"
+    }
+}
+
+/** Opens the system "default browser" chooser, as Via's row does. */
+private fun openDefaultBrowserSettings(context: android.content.Context) {
+    val intent = android.content.Intent(
+        android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS,
+    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }.onFailure {
+        JumpToast.show(context, "Set Jump as the default browser in Android settings")
+    }
+}
 
 private fun activeUserAgentLabel(desktopMode: Boolean): String?
     = if (desktopMode) "Desktop" else null

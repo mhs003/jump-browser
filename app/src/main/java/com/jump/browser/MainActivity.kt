@@ -98,6 +98,13 @@ class MainActivity : ComponentActivity() {
                 DarkMode.LIGHT -> false
                 DarkMode.DARK -> true
             }
+            // Toolbars settings → Color mode can force the chrome light or
+            // dark independently of the theme and of the page darkening.
+            val chromeDark = when (settings.toolbarColor) {
+                "DARK" -> true
+                "LIGHT" -> false
+                else -> dark
+            }
             val browser = remember {
                 BrowserController(this, app.container) { intent -> fileChooser.launch(intent) }
             }
@@ -108,7 +115,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 browser.handleIntent(intent)
             }
-            JumpTheme(darkTheme = dark) {
+            JumpTheme(darkTheme = chromeDark) {
                 BrowserRoot(
                     controller = browser,
                     container = app.container,

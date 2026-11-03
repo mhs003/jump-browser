@@ -10,6 +10,33 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Added
+
+- Incognito mode is now a browser-wide setting that persists across restarts:
+  while it is on every new tab is incognito and tabs are not restored.
+- Swiping left or right on the bottom bar switches tabs. The bar follows the
+  finger for a short distance and changes tab on release with no transition.
+  Swiping past the last tab wraps to the first, and past the first to the last.
+- Settings → General now covers Via's rows, with a "Data" group whose
+  Clear data on exit applies the chosen categories when the app is left.
+- Closed tabs can be reopened from the "Tab closed" toast, unless incognito
+  mode is on or the toast is turned off.
+- Toolbars settings gains the two-row toolbar with an optional tab strip, a
+  search toolbar, auto-hide toolbars, URL field content and a toolbar colour
+  mode.
+
+### Changed
+
+- Settings → General → Clear data offers Via's seven categories (Cache, Form
+  data, History, Closed tabs, Web storage, Cookies, App cache), with the two
+  caches ticked by default. Only the ticked categories are wiped.
+- Settings → General → User-agent lists Via's agents (Default, Android Phone
+  and Tablet, Chrome PC, Windows IE 11, macOS, iPhone, iPad, Symbian and
+  Custom) with a free-text custom agent, a desktop-mode agent and
+  user-agent reduction.
+- Toolbars settings is a working page rather than a stub: toolbar UI mode,
+  auto-hide, tab bar, URL field content, colour mode and auto-adjust.
+
 ## [1.1.5] - 2026-11-03
 
 ### Added

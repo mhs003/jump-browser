@@ -30,10 +30,12 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebIconDatabase
 import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebViewDatabase
 import android.widget.EditText
 import android.widget.FrameLayout
 import androidx.compose.runtime.getValue
@@ -43,6 +45,7 @@ import androidx.core.content.ContextCompat
 import com.jump.browser.data.LoginAutofill
 import com.jump.browser.ui.JumpToast
 import com.jump.browser.data.AppContainer
+import com.jump.browser.data.ClearDataFlag
 import com.jump.browser.data.TabSnapshot
 import com.jump.browser.data.TabStore
 import org.json.JSONObject
@@ -70,6 +73,14 @@ data class TabInfo(
 ) {
     val isHome: Boolean get() = url == null
 }
+
+/** A tab that was closed, kept so it can be reopened. */
+data class ClosedTab(
+    val url: String?,
+    val title: String,
+    val incognito: Boolean,
+    val desktopMode: Boolean,
+)
 
 data class ReaderData(
     val title: String,
@@ -162,6 +173,23 @@ class BrowserController(
     val activeTab: TabInfo?
         get() = tabs.firstOrNull { it.id == activeId }
 
+    /**
+     * Recently closed tabs, newest first, so closing one can be undone.
+     *
+     * Kept in memory only: via never writes closed tabs to disk, and the
+     * "Closed tabs" option of Clear data wipes this list.
+     */
+    private val closedTabs = ArrayDeque<ClosedTab>()
+
+    fun canRestoreClosedTab(): Boolean = closedTabs.isNotEmpty()
+
+    /** Reopens the most recently closed tab, if any. */
+    fun restoreClosedTab(): Boolean {
+        val closed = closedTabs.removeFirstOrNull() ?: return false
+        newTab(closed.url, incognito = closed.incognito, desktopMode = closed.desktopMode, title = closed.title)
+        return true
+    }
+
     val canGoBack: Boolean get() = activeTab?.canGoBack == true
     val canGoForward: Boolean get() = activeTab?.canGoForward == true
 
@@ -205,6 +233,11 @@ class BrowserController(
         val s = sessions[id] ?: return
         s.info = transform(s.info)
         publish(id)
+    }
+
+    private companion object {
+        /** Via keeps a short undo history; older entries are dropped. */
+        const val MAX_CLOSED_TABS = 5
     }
 
     private fun homeUrl(): String? {
@@ -257,6 +290,29 @@ class BrowserController(
 
     fun closeTab(id: Long) {
         val s = sessions[id] ?: return
+        // Incognito tabs are never remembered: doing so would write the page
+        // they were showing into memory the user asked to keep clean. Via also
+        // hides the undo toast entirely in incognito mode.
+        val remember = !s.info.incognito
+        if (remember) {
+            closedTabs.addFirst(
+                ClosedTab(
+                    url = s.info.url,
+                    title = s.info.title,
+                    incognito = false,
+                    desktopMode = s.info.desktopMode,
+                )
+            )
+            while (closedTabs.size > MAX_CLOSED_TABS) closedTabs.removeLast()
+            if (app.settings.settings.showUndoToast && !app.settings.settings.incognitoDefault) {
+                JumpToast.show(
+                    activity,
+                    "Tab closed",
+                    action = "Undo",
+                    onAction = { restoreClosedTab() },
+                )
+            }
+        }
         val wasActive = activeId == id
         val order = sessions.keys.toList()
         val index = order.indexOf(id)
@@ -301,6 +357,23 @@ class BrowserController(
         val s = sessions[id] ?: return
         val url = s.info.url ?: return
         newTab(url, incognito = s.info.incognito, desktopMode = s.info.desktopMode)
+    }
+
+    /**
+     * Switches to the tab [delta] positions away, wrapping around both ends.
+     *
+     * Used by the bottom bar's horizontal swipe: swiping left moves to the
+     * next tab (to the right) and swiping right moves to the previous one.
+     * Past the last tab it wraps to the first, and past the first to the last.
+     */
+    fun switchTab(delta: Int) {
+        val order = sessions.keys.toList()
+        if (order.size < 2) return
+        val current = activeId ?: return
+        val from = order.indexOf(current)
+        if (from < 0) return
+        val to = Math.floorMod(from + delta, order.size)
+        selectTab(order[to])
     }
 
     fun moveTab(id: Long, delta: Int) {
@@ -491,6 +564,27 @@ class BrowserController(
         contextMenu = null
     }
 
+    /** True while the chrome is hidden by the scroll mode. */
+    var chromeHidden by mutableStateOf(false)
+        private set
+
+    private var lastScrollY = 0
+
+    private fun onPageScrolled(y: Int) {
+        if (app.settings.settings.autoHideToolbars != "SCROLL") {
+            if (chromeHidden) chromeHidden = false
+            lastScrollY = y
+            return
+        }
+        val delta = y - lastScrollY
+        lastScrollY = y
+        when {
+            y <= 8 -> if (chromeHidden) chromeHidden = false
+            delta > 12 && !chromeHidden -> chromeHidden = true
+            delta < -8 && chromeHidden -> chromeHidden = false
+        }
+    }
+
     fun scrollToTop() {
         activeWebView()?.evaluateJavascript("window.scrollTo({top:0,behavior:'smooth'});", null)
     }
@@ -514,10 +608,39 @@ class BrowserController(
         s.info = s.info.copy(desktopMode = enabled)
         publish()
         s.webView?.let { w ->
-            w.settings.userAgentString = if (enabled) desktopUa else null
+            val fallback = defaultUserAgent()
+            w.settings.userAgentString = if (enabled) {
+                UserAgents.desktopAgent(app.settings.settings, fallback)
+            } else {
+                UserAgents.mobileAgent(app.settings.settings, fallback)
+            }
             w.reload()
         }
         JumpToast.show(activity, if (enabled) "Desktop site enabled" else "Desktop site disabled")
+    }
+
+    /**
+     * Turns incognito mode on or off for the whole browser.
+     *
+     * Via treats this as a mode, not a per-tab flag: once it is on every new
+     * tab is incognito, and it stays on across restarts until the user turns it
+     * off. Turning it off converts the existing incognito tabs back to normal
+     * ones so their history resumes being recorded.
+     */
+    fun setIncognitoMode(enabled: Boolean) {
+        app.settings.update { it.copy(incognitoDefault = enabled) }
+        if (!enabled) {
+            sessions.values.filter { it.info.incognito }.forEach { s ->
+                s.info = s.info.copy(incognito = false)
+            }
+        }
+        val active = activeId?.let { sessions[it] }
+        if (active != null && active.info.incognito != enabled) {
+            active.info = active.info.copy(incognito = enabled)
+        }
+        publish()
+        notify(if (enabled) "Incognito mode on" else "Incognito mode off")
+        saveState()
     }
 
     fun setIncognito(enabled: Boolean) {
@@ -701,7 +824,11 @@ class BrowserController(
             cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             textZoom = settings.textZoom
-            userAgentString = if (s.info.desktopMode) desktopUa else baseUa
+            userAgentString = if (s.info.desktopMode) {
+                UserAgents.desktopAgent(settings, baseUa)
+            } else {
+                UserAgents.mobileAgent(settings, baseUa)
+            }
             allowFileAccess = true
             allowContentAccess = true
         }
@@ -712,6 +839,13 @@ class BrowserController(
         applyDarkMode(w)
         w.webViewClient = ViaClient(id)
         w.webChromeClient = ViaChromeClient(id)
+        // Drives "Auto-hide toolbars" in scroll mode: hide while the page
+        // moves down, show again as soon as it moves up or reaches the top.
+        w.viewTreeObserver.addOnScrollChangedListener {
+            // The observer fires for any view in the tree; only the page's own
+            // vertical scroll matters here.
+            onPageScrolled(w.scrollY)
+        }
         w.setFindListener { active, total, _ -> findState = active to total }
         w.setDownloadListener { url, userAgent, disposition, mime, _ ->
             if (url.startsWith("blob:")) {
@@ -1469,24 +1603,62 @@ class BrowserController(
         }
     }
 
-    fun clearBrowsingData(clearHistory: Boolean, clearCookies: Boolean, clearCache: Boolean) {
+    /**
+     * Wipes exactly the categories selected in the Clear data dialog.
+     *
+     * The bits are Via's `cleardata2` flags, so each option maps to the same
+     * WebView call Via makes: 1 cache and SSL state, 2 form data, 4 history and
+     * site icons, 8 web storage, 16 saved passwords and HTTP auth, 32 cookies
+     * plus the app cache, 64 closed tabs.
+     */
+    fun clearData(mask: Int) {
+        if (mask == 0) return
         sessions.values.forEach {
             it.webView?.clearFormData()
             it.webView?.clearHistory()
-            // Drop the loaded page so the cleared cookies and cache are not reused.
+            // Drop the loaded page so cleared cookies and cache are not reused.
             it.webView?.loadUrl("about:blank")
         }
-        if (clearCache) {
+        if (mask and ClearDataFlag.CACHE != 0) {
             sessions.values.forEach { it.webView?.clearCache(true) }
+            sessions.values.forEach { it.webView?.clearSslPreferences() }
+        }
+        if (mask and ClearDataFlag.FORM_DATA != 0) {
+            WebViewDatabase.getInstance(activity).clearFormData()
+        }
+        if (mask and ClearDataFlag.HISTORY != 0) {
+            app.history.clear()
+            runCatching { WebIconDatabase.getInstance().removeAllIcons() }
+        }
+        if (mask and ClearDataFlag.CLOSED_TABS != 0) {
+            closedTabs.clear()
+        }
+        if (mask and ClearDataFlag.WEB_STORAGE != 0) {
             WebStorage.getInstance().deleteAllData()
         }
-        if (clearCookies) {
+        if (mask and ClearDataFlag.COOKIES != 0) {
             CookieManager.getInstance().removeAllCookies(null)
             CookieManager.getInstance().flush()
+            val database = WebViewDatabase.getInstance(activity)
+            database.clearHttpAuthUsernamePassword()
+            database.clearUsernamePassword()
+            app.passwords.clear()
         }
-        if (clearHistory) app.history.clear()
+        if (mask and ClearDataFlag.APP_CACHE != 0) {
+            runCatching { activity.cacheDir.deleteRecursively() }
+        }
         CookieManager.getInstance().flush()
-        notify("Browsing data cleared")
+        // Bumped by the caller-visible "last clean" stamp Via keeps.
+        app.settings.update { it.copy(clearDataMask = mask) }
+        notify("Data cleared")
+    }
+
+    fun clearBrowsingData(clearHistory: Boolean, clearCookies: Boolean, clearCache: Boolean) {
+        var mask = 0
+        if (clearCache) mask = mask or ClearDataFlag.CACHE or ClearDataFlag.APP_CACHE
+        if (clearCookies) mask = mask or ClearDataFlag.COOKIES
+        if (clearHistory) mask = mask or ClearDataFlag.HISTORY
+        clearData(mask)
     }
 
     fun handleIntent(intent: Intent?) {
@@ -1531,8 +1703,11 @@ class BrowserController(
     }
 
     private fun restoreTabs() {
-        if (!app.settings.settings.restoreTabs) {
-            newTab(null, incognito = false)
+        // Via keeps the incognito mode across restarts but never restores tabs
+        // into it: the session starts empty so nothing leaks to disk.
+        val incognito = app.settings.settings.incognitoDefault
+        if (incognito || !app.settings.settings.restoreTabs) {
+            newTab(null, incognito = incognito)
             return
         }
         val (snapshots, activeIndex) = app.tabs.load()
@@ -1568,7 +1743,50 @@ class BrowserController(
         app.downloads.refresh()
     }
 
+    /**
+     * Applies the "Clear data on exit" selection.
+     *
+     * Via treats this as "when the app leaves", not "on every background": it
+     * runs once as the task goes away, and does nothing when the user has not
+     * ticked anything. Bookmarks, downloads and settings are never touched.
+     */
+    fun applyClearOnExit() {
+        val mask = app.settings.settings.clearDataOnExitMask
+        if (mask == 0) return
+        runCatching { clearDataSilently(mask) }
+    }
+
+    /** The same wipe as [clearData] but without the toast, since we are exiting. */
+    private fun clearDataSilently(mask: Int) {
+        if (mask and ClearDataFlag.CACHE != 0) {
+            sessions.values.forEach { it.webView?.clearCache(true) }
+        }
+        if (mask and ClearDataFlag.FORM_DATA != 0) {
+            WebViewDatabase.getInstance(activity).clearFormData()
+        }
+        if (mask and ClearDataFlag.HISTORY != 0) {
+            app.history.clear()
+            runCatching { WebIconDatabase.getInstance().removeAllIcons() }
+        }
+        if (mask and ClearDataFlag.CLOSED_TABS != 0) closedTabs.clear()
+        if (mask and ClearDataFlag.WEB_STORAGE != 0) {
+            WebStorage.getInstance().deleteAllData()
+        }
+        if (mask and ClearDataFlag.COOKIES != 0) {
+            CookieManager.getInstance().removeAllCookies(null)
+            CookieManager.getInstance().flush()
+            val database = WebViewDatabase.getInstance(activity)
+            database.clearHttpAuthUsernamePassword()
+            database.clearUsernamePassword()
+            app.passwords.clear()
+        }
+        if (mask and ClearDataFlag.APP_CACHE != 0) {
+            runCatching { activity.cacheDir.deleteRecursively() }
+        }
+    }
+
     fun onDestroy() {
+        applyClearOnExit()
         saveState()
         sessions.values.forEach { destroyWebView(it) }
         sessions.clear()

@@ -139,6 +139,23 @@ data class SearchEngine(
     }
 }
 
+/**
+ * What the Clear data action wipes, using the same bits as Via's
+ * `cleardata2` preference so the dialogs and masks line up one to one.
+ */
+object ClearDataFlag {
+    const val CACHE = 0x01
+    const val FORM_DATA = 0x02
+    const val HISTORY = 0x04
+    const val CLOSED_TABS = 0x40
+    const val WEB_STORAGE = 0x08
+    const val COOKIES = 0x10
+    const val APP_CACHE = 0x20
+}
+
+/** Cache and App cache are pre-selected, as in Via's confirmation dialog. */
+const val DEFAULT_CLEAR_MASK: Int = ClearDataFlag.CACHE or ClearDataFlag.APP_CACHE
+
 data class AppSettings(
     val searchEngineId: String = "google",
     val customSearchUrl: String = "",
@@ -170,11 +187,37 @@ data class AppSettings(
     val homepageBackgroundOpacity: Int = 100,
     val homepageSearchBar: Boolean = true,
     val homepageFavoriteColor: Boolean = true,
-    val toolbarPosition: String = "TOP",        // TOP, BOTTOM, BOTTOM_SLIM
-    val toolbarLayout: String = "ADDRESS_FIRST", // ADDRESS_FIRST, TITLE_AND_ADDRESS
-    val toolbarSearch: Boolean = true,
+    /** Toolbar UI mode: SANDWICH, TOP, BOTTOM or TWO_ROW. */
+    val toolbarPosition: String = "TOP",
+    /** What the address bar shows: TITLE, URL or DOMAIN. */
+    val urlFieldContent: String = "TITLE",
+    /** Show the tab bar (two-row mode only). */
+    val showTabBar: Boolean = true,
+    /** NEVER, SCROLL or PRESS. */
+    val autoHideToolbars: String = "NEVER",
+    /** Show a search field in the toolbar. */
+    val searchToolbar: Boolean = false,
+    /** AUTO, DARK or LIGHT. */
+    val toolbarColor: String = "AUTO",
+    val autoAdjustToolbarColor: Boolean = true,
     val customizeMenu: List<String> = emptyList(),
-    val userAgent: String = "",
+    /**
+     * Base user agent: DEFAULT, DESKTOP, ANDROID, ANDROID_TABLET,
+     * WINDOWS_CHROME, WINDOWS_IE, IPHONE or IPAD. [customUserAgent] is used
+     * when this is CUSTOM.
+     */
+    val userAgent: String = "DEFAULT",
+    val customUserAgent: String = "",
+    /** The desktop-mode user agent actually sent when desktop mode is on. */
+    val desktopUserAgent: String = "",
+    /** Strip device and minor-version details from the user agent. */
+    val userAgentReduction: Boolean = false,
+    /** Bit mask of what the Clear data dialog wipes. */
+    val clearDataMask: Int = DEFAULT_CLEAR_MASK,
+    /** Bit mask of what is wiped when the browser exits. Empty means never. */
+    val clearDataOnExitMask: Int = 0,
+    /** Show the "tab closed" toast, which offers an undo. */
+    val showUndoToast: Boolean = true,
 ) {
     val searchEngine: SearchEngine
         get() {

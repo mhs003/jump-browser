@@ -15,9 +15,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +58,7 @@ import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +74,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -112,6 +118,7 @@ val DEFAULT_MENU_ORDER: List<String> = listOf(
 fun TitleBar(
     tab: TabInfo?,
     bookmark: Boolean,
+    urlFieldContent: String = "TITLE",
     onOpenAddress: () -> Unit,
     onLeftClick: () -> Unit,
     onRightClick: () -> Unit,
@@ -151,8 +158,16 @@ fun TitleBar(
                 ),
             contentAlignment = Alignment.CenterStart,
         ) {
+            // "URL field content" decides whether the bar shows the page
+            // title, the full address or just the domain, as in Via.
             BasicText(
-                text = if (isHome) "Homepage" else (tab?.title?.ifBlank { tab.url } ?: ""),
+                text = if (isHome) {
+                    "Homepage"
+                } else when (urlFieldContent) {
+                    "URL" -> tab?.url ?: ""
+                    "DOMAIN" -> tab?.url?.let { UrlField.domainOf(it) } ?: ""
+                    else -> tab?.title?.ifBlank { tab.url } ?: ""
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(
@@ -426,6 +441,7 @@ fun TopChrome(
     onRightClick: () -> Unit,
     onTitleLongClick: () -> Unit,
     onSecureClick: () -> Unit,
+    urlFieldContent: String = "TITLE",
 ) {
     AnimatedContent(
         targetState = editing,
@@ -447,6 +463,7 @@ fun TopChrome(
             TitleBar(
                 tab = tab,
                 bookmark = false,
+                urlFieldContent = urlFieldContent,
                 onOpenAddress = onOpenAddress,
                 onLeftClick = onLeftClick,
                 onRightClick = onRightClick,
@@ -472,20 +489,86 @@ fun BottomBar(
     onBackLong: () -> Unit,
     onHomeLong: () -> Unit,
     onForwardLong: () -> Unit,
+    onSwitchTab: (Int) -> Unit = {},
+    /** Toolbars settings → Enable search toolbar. */
+    searchToolbar: Boolean = false,
+    onSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val canBack = tab?.canGoBack == true
     val canForward = tab?.canGoForward == true
+    val density = LocalDensity.current
+    // How far the bar slides under the finger before it commits.
+    val followLimitPx = with(density) { 56.dp.toPx() }
+    val commitDistancePx = with(density) { 40.dp.toPx() }
+    var offset by remember { mutableFloatStateOf(0f) }
+    val swipable = tabs.size > 1
+
+    // Drag the bar with the finger, then snap it back and switch tab in the
+    // same frame on release: no transition animation, as in Via.
+    val dragState = rememberDraggableState { delta ->
+        if (!swipable) return@rememberDraggableState
+        offset = (offset + delta).coerceIn(-followLimitPx, followLimitPx)
+    }
     Row(
         modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .height(48.dp),
+            .height(48.dp)
+            .graphicsLayer { translationX = offset }
+            .draggable(
+                state = dragState,
+                orientation = Orientation.Horizontal,
+                startDragImmediately = false,
+                onDragStopped = { velocity ->
+                    if (!swipable) return@draggable
+                    val projected = offset + velocity * 0.05f
+                    offset = 0f
+                    when {
+                        projected < -commitDistancePx -> onSwitchTab(1)
+                        projected > commitDistancePx -> onSwitchTab(-1)
+                    }
+                },
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BottomSlot(ReferenceIcons.Back, "Go back", canBack, onBack, onBackLong)
         BottomSlot(ReferenceIcons.Forward, "Go forward", canForward, onForward, onForwardLong)
-        BottomSlot(ReferenceIcons.Home, "Home", true, onHome, onHomeLong)
+        if (searchToolbar) {
+            // The search toolbar replaces the home button with an inline
+            // search field, matching Via's compact bottom bar.
+            val searchInteraction = remember { MutableInteractionSource() }
+            Row(
+                Modifier
+                    .weight(2f)
+                    .fillMaxHeight()
+                    .padding(horizontal = 2.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(
+                        interactionSource = searchInteraction,
+                        indication = com.jump.browser.ui.theme.JumpPressIndication,
+                        onClick = onSearch,
+                    )
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    ReferenceIcons.Search,
+                    contentDescription = "Search",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Search",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            BottomSlot(ReferenceIcons.Home, "Home", true, onHome, onHomeLong)
+        }
         val countInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         Box(
             Modifier
@@ -815,6 +898,90 @@ fun TabPopup(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Display helpers for the address bar's "URL field content" setting. */
+internal object UrlField {
+    /** "https://www.example.com/a/b?c" → "example.com". */
+    fun domainOf(url: String): String {
+        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull() ?: return url
+        return host.removePrefix("www.")
+    }
+
+    /** What to show in the title bar for a tab's address bar. */
+    fun display(url: String?, title: String?, content: String): String {
+        if (url.isNullOrBlank()) return title.orEmpty()
+        return when (content) {
+            "URL" -> url
+            "DOMAIN" -> domainOf(url)
+            else -> title?.ifBlank { url } ?: url
+        }
+    }
+}
+
+/**
+ * The optional tab strip of the two-row toolbar.
+ *
+ * Shown only when Toolbars settings picks "Two-row toolbar" with the tab bar
+ * enabled. Tabs scroll horizontally, and the highlighted one is the active tab.
+ */
+@Composable
+fun TabStrip(
+    tabs: List<TabInfo>,
+    activeId: Long?,
+    onSelect: (Long) -> Unit,
+    onNewTab: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabs.forEach { tab ->
+            val selected = tab.id == activeId
+            Row(
+                Modifier
+                    .padding(horizontal = 2.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            androidx.compose.ui.graphics.Color.Transparent
+                        },
+                    )
+                    .jumpClickable { onSelect(tab.id) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Favicon(tab, 14)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    tab.title.ifBlank { tab.url ?: "Homepage" },
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 110.dp),
+                )
+            }
+        }
+        Box(
+            Modifier
+                .size(36.dp)
+                .jumpClickable(onClick = onNewTab),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                ReferenceIcons.Plus,
+                contentDescription = "New tab",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

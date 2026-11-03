@@ -422,8 +422,24 @@ fun BrowserRoot(
                 .graphicsLayer { translationX = -screenWidthPx * 0.30f * pageProgress },
         ) {
             val bottomToolbar = settings.toolbarPosition != "TOP"
+            // Toolbars settings → Auto-hide: in scroll mode the chrome fades
+            // away while the page scrolls down and comes back on scroll up.
+            // Never while the address field is being edited.
+            val hideChrome = settings.autoHideToolbars == "SCROLL" &&
+                controller.chromeHidden && !editing
+            // Two-row toolbar: a tab strip sits above the address bar.
+            val showTabStrip = settings.toolbarPosition == "TWO_ROW" && settings.showTabBar
             if (bottomToolbar) {
+                if (!hideChrome) {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                if (showTabStrip) {
+                    TabStrip(
+                        tabs = controller.tabs,
+                        activeId = active?.id,
+                        onSelect = { id -> controller.selectTab(id) },
+                        onNewTab = { controller.newHomeTab() },
+                    )
+                }
                 TopChrome(
                     editing = editing,
                     tab = active,
@@ -442,10 +458,25 @@ fun BrowserRoot(
                     },
                     onTitleLongClick = { closeAllOverlays(); titleMenu = true },
                     onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                    urlFieldContent = settings.urlFieldContent,
                 )
+                }
             }
             if (!bottomToolbar) {
+                if (hideChrome) {
+                    // The bar still reserves the status bar so the page does
+                    // not jump upwards when the chrome fades.
+                    Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                } else {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                if (showTabStrip) {
+                    TabStrip(
+                        tabs = controller.tabs,
+                        activeId = active?.id,
+                        onSelect = { id -> controller.selectTab(id) },
+                        onNewTab = { controller.newHomeTab() },
+                    )
+                }
                 TopChrome(
                     editing = editing,
                     tab = active,
@@ -464,7 +495,9 @@ fun BrowserRoot(
                     },
                     onTitleLongClick = { closeAllOverlays(); titleMenu = true },
                     onSecureClick = { if (active?.isHome != false) searchEngineDialog = true else siteInfoDialog = true },
+                    urlFieldContent = settings.urlFieldContent,
                 )
+                }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView(
@@ -560,6 +593,9 @@ fun BrowserRoot(
                     onForward = { closeTabsOnly(); controller.goForward() },
                     onHome = { closeAllOverlays(); controller.goHome() },
                     onHomeLong = { closeAllOverlays(); startAddressEditing() },
+                    onSwitchTab = { delta -> closeTabsOnly(); controller.switchTab(delta) },
+                    searchToolbar = settings.searchToolbar,
+                    onSearch = { closeTabsOnly(); startAddressEditing("") },
                     onNewTab = { closeTabsOnly(); controller.newHomeTab() },
                     onMenuLong = { openPage(LibraryPage.SETTINGS) },
                     onBackLong = { closeTabsOnly(); controller.scrollToTop() },
@@ -582,7 +618,7 @@ fun BrowserRoot(
                     },
                 )
             } else {
-                Column(Modifier.fillMaxWidth()) {
+                if (!hideChrome) Column(Modifier.fillMaxWidth()) {
                     BottomBar(
                         tab = active,
                         tabs = controller.tabs,
@@ -590,6 +626,9 @@ fun BrowserRoot(
                         onForward = { closeTabsOnly(); controller.goForward() },
                         onHome = { closeAllOverlays(); controller.goHome() },
                         onHomeLong = { closeAllOverlays(); startAddressEditing() },
+                        onSwitchTab = { delta -> closeTabsOnly(); controller.switchTab(delta) },
+                        searchToolbar = settings.searchToolbar,
+                        onSearch = { closeTabsOnly(); startAddressEditing("") },
                         onNewTab = { closeTabsOnly(); controller.newHomeTab() },
                         onMenuLong = { openPage(LibraryPage.SETTINGS) },
                         onBackLong = { closeTabsOnly(); controller.scrollToTop() },
@@ -658,7 +697,10 @@ fun BrowserRoot(
                     MenuAction.HISTORY -> { recordsTab = 1; openPage(LibraryPage.RECORDS) }
                     MenuAction.DOWNLOADS -> openPage(LibraryPage.DOWNLOADS)
                     MenuAction.SETTINGS -> openPage(LibraryPage.SETTINGS)
-                    MenuAction.INCOGNITO -> controller.setIncognito(active?.incognito != true)
+                    // The menu switches the browser-wide mode, the same one
+                    // Settings uses, so new tabs follow it and it survives a
+                    // restart until the user turns it off.
+                    MenuAction.INCOGNITO -> controller.setIncognitoMode(active?.incognito != true)
                     MenuAction.SHARE -> controller.shareUrl(active?.url, active?.title)
                     MenuAction.ADD_BOOKMARK -> {
                         val url = active?.url
@@ -790,7 +832,7 @@ fun BrowserRoot(
         TabPopup(
             visible = showTabs,
             tabs = controller.tabs,
-            activeId = controller.activeId,
+            activeId = active?.id,
             onSelect = { id -> controller.selectTab(id); showTabs = false },
             onClose = { id -> controller.closeTab(id) },
             onNewTab = { controller.newHomeTab(); showTabs = false },
@@ -967,12 +1009,13 @@ fun BrowserRoot(
                             controller.applySettingsToAll()
                         },
                         onClearData = {
-                            val wasIncognito = active?.incognito == true
-                            controller.closeAllTabs()
-                            controller.clearBrowsingData(true, true, true)
-                            controller.newHomeTab()
-                            if (wasIncognito) controller.newTab(null, incognito = true)
+                            // Wipes exactly what the dialog ticked, then
+                            // reloads the tabs so nothing stale is on screen.
+                            controller.clearData(container.settings.settings.clearDataMask)
                             page = LibraryPage.NONE
+                        },
+                        controllerSetIncognito = { enabled ->
+                            controller.setIncognitoMode(enabled)
                         },
                         onAbout = { aboutDialog = true },
                     )

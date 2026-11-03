@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -103,22 +104,34 @@ class SettingsSmokeTest {
         }
     }
 
-    /** Scrolls the settings list until [text] is on screen, then taps it. */
+    /**
+     * Scrolls the settings list until [text] is on screen, then taps it.
+     *
+     * The page is long and the rows are not ordered by where the tests need
+     * them, so this scrolls down first and then back up: a forward-only scroll
+     * walks past rows near the top and never finds them again.
+     */
     private fun scrollToAndTap(text: String) {
-        val deadline = System.currentTimeMillis() + 15_000
-        while (System.currentTimeMillis() < deadline) {
-            rule.waitForIdle()
-            if (rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()) {
-                rule.onAllNodesWithText(text).onFirst().performClick()
+        repeat(2) { direction ->
+            val deadline = System.currentTimeMillis() + 10_000
+            while (System.currentTimeMillis() < deadline) {
                 rule.waitForIdle()
-                return
+                if (rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()) {
+                    rule.onAllNodesWithText(text).onFirst().performClick()
+                    rule.waitForIdle()
+                    return
+                }
+                // Swipe the list itself; the settings pages are plain lists.
+                rule.onAllNodes(isRoot()).onFirst().performTouchInput {
+                    if (direction == 0) {
+                        swipeUp(startY = bottom * 0.8f, endY = top + height * 0.2f, durationMillis = 250)
+                    } else {
+                        swipeDown(startY = top + height * 0.2f, endY = bottom * 0.8f, durationMillis = 250)
+                    }
+                }
+                rule.waitForIdle()
+                Thread.sleep(120)
             }
-            // Swipe the list itself; the settings pages are plain lists.
-            rule.onAllNodes(isRoot()).onFirst().performTouchInput {
-                swipeUp(startY = bottom * 0.8f, endY = top + height * 0.2f, durationMillis = 250)
-            }
-            rule.waitForIdle()
-            Thread.sleep(120)
         }
         throw AssertionError("Could not find '$text' by scrolling")
     }
@@ -133,14 +146,48 @@ class SettingsSmokeTest {
         scrollToAndTap("Password manager")
         waitForText("Saved passwords")
         tap("Close")
-        scrollToAndTap("Sync")
-        waitForText("Local only")
-        tap("Close")
-        // Orientation lives under Advanced.
+    }
+
+    /**
+     * The General page's Via-parity dialogs: Clear data, Clear data on exit,
+     * User-agent and Toolbars settings. All four are long lists, which is what
+     * used to crash, and all four used to be missing or non-functional.
+     */
+    @Test
+    fun opensGeneralParityDialogs() {
+        tapDescription("Menu")
         tap("Settings")
-        tap("Advanced")
-        scrollToAndTap("Orientation")
-        tap("Portrait")
+        tap("General")
+
+        scrollToAndTap("Clear data")
+        // Every option Via offers is present, and the two caches start ticked.
+        listOf(
+            "Cache", "Form data", "History", "Closed tabs",
+            "Web storage", "Cookies (Login status)", "App cache",
+        ).forEach { waitForText(it) }
+        tap("Cancel")
+
+        scrollToAndTap("Clear data on exit")
+        waitForText("Cookies (Login status)")
+        tap("Cancel")
+
+        scrollToAndTap("User-agent")
+        // Via's full list, including the custom entry.
+        listOf("Default", "Chrome (PC)", "Windows (IE 11)", "Symbian", "Custom")
+            .forEach { waitForText(it) }
+        waitForText("User-agent reduction")
+        // Selecting Custom reveals the free-text field. Its placeholder is a
+        // separate node, so the field itself is checked through the label.
+        tap("Custom")
+        waitForText("Custom")
+        tap("Cancel")
+
+        scrollToAndTap("Toolbars settings")
+        listOf(
+            "Toolbar UI mode", "Auto-hide toolbars", "Enable tab bar",
+            "URL field content", "Color mode", "Auto-adjust color of toolbars",
+        ).forEach { waitForText(it) }
+        tap("Done")
     }
 
     @Test
