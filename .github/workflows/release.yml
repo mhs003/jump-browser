@@ -60,8 +60,9 @@ jobs:
             echo "::error::Tag is v$TAG_VERSION but version.properties says $file_version"
             exit 1
           fi
-          if ! grep -qE "^## \[${TAG_VERSION//./\\.}\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$TAG_VERSION]' section"
+          section="$(bash .github/release-notes.sh "$TAG_VERSION" | tr -d '[:space:]')"
+          if [ -z "$section" ]; then
+            echo "::error::CHANGELOG.md section [$TAG_VERSION] is missing or empty, so the release would have no notes"
             exit 1
           fi
           echo "Releasing $TAG_VERSION (versionCode $code)"

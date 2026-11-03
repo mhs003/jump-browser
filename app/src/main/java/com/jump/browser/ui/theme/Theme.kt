@@ -155,118 +155,57 @@ internal val DarkColors = JumpColorScheme(
     outlineVariant = Color(0xFF333336),
     error = Color(0xFFFF7A7E),
 )
-
 /**
- * The reference ripple: a translucent grey wash that spreads from the touch
- * point and fades out. Replaces `material3.ripple`, which pulls the whole
- * Material ripple machinery into the APK.
+ * The press feedback used everywhere: a flat grey wash over the control while
+ * it is held, cleared on release.
  *
- * Two details make it behave correctly:
- *
- * - The animation is observed as snapshot state and the node invalidates its
- *   draw every frame. Reading an `Animatable` only inside `draw()` does not
- *   schedule repaints, so the ripple would appear once and freeze.
- * - Instances compare equal across recompositions, so Compose reuses the node
- *   instead of tearing it down mid-press (which shows up as a flicker on the
- *   button).
+ * This is deliberately not an animated ripple. A ripple needs frame-accurate
+ * expansion, fade timing and clipping to look right, and anything slightly off
+ * reads as a flicker or a blob that stops short of the edge. A static tint is
+ * what the reference shows on a held control, it cannot look wrong, and it
+ * costs one layer instead of a per-frame animation.
  */
-fun ripple(color: Color = JumpRipple, bounded: Boolean = true): IndicationNodeFactory =
-    RippleIndication(color, bounded)
+val JumpPressIndication: IndicationNodeFactory = PressIndication(JumpPressed)
 
-/**
- * The two ripple variants used by the app.
- *
- * Hoisted to constants so the same instance is passed on every recomposition.
- * A fresh instance per composition would still compare equal, but keeping one
- * object removes any chance of Compose recreating the node mid-press.
- */
-val JumpRippleIndication: IndicationNodeFactory = RippleIndication(JumpRipple, bounded = true)
+/** Same feedback for controls that clip themselves. */
+val JumpPressUnbounded: IndicationNodeFactory = PressIndication(JumpPressed)
 
-/** For controls that clip themselves, so the wash is not cut off. */
-val JumpRippleUnbounded: IndicationNodeFactory = RippleIndication(JumpRipple, bounded = false)
-
-private class RippleIndication(
+private class PressIndication(
     private val color: Color,
-    private val bounded: Boolean,
 ) : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode =
-        RippleNode(color, bounded, interactionSource)
+        PressNode(color, interactionSource)
 
     override fun equals(other: Any?): Boolean =
-        other is RippleIndication && other.color == color && other.bounded == bounded
+        other is PressIndication && other.color == color
 
-    override fun hashCode(): Int = 31 * color.hashCode() + bounded.hashCode()
+    override fun hashCode(): Int = color.hashCode()
 }
 
-private class RippleNode(
+private class PressNode(
     private val color: Color,
-    private val bounded: Boolean,
     private val source: InteractionSource,
 ) : Modifier.Node(), DrawModifierNode {
-    /**
-     * Plain snapshot state, not an `Animatable`: `DrawModifierNode.draw` is not
-     * a snapshot-observed scope, so a value read there does not register a
-     * dependency or schedule another frame. Writing this state from the
-     * animation loop invalidates the draw on every step.
-     */
-    private var progress by mutableFloatStateOf(0f)
-    private var centre by mutableStateOf(Offset.Unspecified)
-    private var job: Job? = null
+    private var pressed by mutableStateOf(false)
 
     override fun onAttach() {
         coroutineScope.launch {
             source.interactions.collect { interaction ->
                 when (interaction) {
-                    is PressInteraction.Press -> {
-                        centre = interaction.pressPosition
-                        // A new press restarts cleanly instead of fighting the
-                        // previous animation.
-                        job?.cancel()
-                        job = launch { animateProgress(from = 0f, to = 1f, duration = 180) }
-                    }
-                    is PressInteraction.Release, is PressInteraction.Cancel -> {
-                        job?.cancel()
-                        val start = progress
-                        job = launch { animateProgress(from = start, to = 0f, duration = 160) }
-                    }
+                    is PressInteraction.Press -> pressed = true
+                    is PressInteraction.Release, is PressInteraction.Cancel -> pressed = false
                 }
             }
         }
     }
 
-    /** Steps [progress] in real time so each step invalidates the draw. */
-    private suspend fun animateProgress(from: Float, to: Float, duration: Int) {
-        val frames = (duration / 16).coerceAtLeast(1)
-        for (frame in 0..frames) {
-            val t = frame / frames.toFloat()
-            progress = from + (to - from) * FastOutSlowInEasing.transform(t)
-            delay(16)
-        }
-        progress = to
-    }
-
     override fun ContentDrawScope.draw() {
         drawContent()
-        val p = progress
-        if (p <= 0.001f) return
-        val origin = if (centre == Offset.Unspecified) center else centre
-        // A backdrop-wash ripple: the disc grows to cover the whole control
-        // from wherever it was pressed. Using the farthest corner (rather than
-        // the longer side) is what makes the wash reach every edge.
-        val reach = if (bounded) {
-            val dx = max(origin.x, size.width - origin.x)
-            val dy = max(origin.y, size.height - origin.y)
-            hypot(dx, dy)
-        } else {
-            hypot(size.width, size.height)
-        }
-        // Grows over the first 60% of the press animation, then holds; the
-        // release drives the same value back to zero, which fades the wash.
-        val grown = (p / 0.6f).coerceAtMost(1f)
-        drawCircle(color = color, radius = reach * grown, center = origin)
+        if (pressed) drawRect(color)
     }
-
 }
+
+
 
 /**
  * An indication that draws nothing.

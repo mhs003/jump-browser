@@ -97,10 +97,13 @@ new_section = ""
 if cleaned:
     new_section = heading + "\n\n" + "\n\n".join(cleaned) + "\n\n"
 else:
-    # An empty [Unreleased] is normal for a release commit that only carries a
-    # workflow fix. The heading must still exist: both the CI and release
-    # workflows refuse a version without one.
-    new_section = heading + "\n\nNo user-facing changes.\n\n"
+    # No entries under [Unreleased]. That is normal for a release that only
+    # carries a workflow fix, but it must not silently ship an empty release
+    # body, so say why explicitly.
+    new_section = (
+        heading + "\n\n### Changed\n\n"
+        "- Maintenance release: build, tooling and dependency updates only.\n\n"
+    )
 
 text = text[:start.end()] + "\n" + new_section + tail
 path.write_text(text)

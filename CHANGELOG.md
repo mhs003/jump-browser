@@ -12,11 +12,28 @@ workflow refuses to publish otherwise.
 
 ## [1.1.2] - 2026-11-03
 
-No user-facing changes.
+### Changed
+
+- Press feedback is a flat grey wash while a control is held, cleared on
+  release, instead of an expanding ripple. A ripple needs frame-accurate
+  growth, fade and clipping to look right; anything slightly off reads as a
+  flicker or a blob that stops short of the edge, so the simpler, steady
+  highlight is used everywhere.
+
+### Fixed
+
+- Download list refreshes no longer run on the launch path: the system
+  download manager query moved off the main thread.
 
 ## [1.1.1] - 2026-11-03
 
-No user-facing changes.
+### Fixed
+
+- Release workflow publishes the universal APK. Enabling per-ABI splits renamed
+  the output, so packaging failed with "Release APK was not produced" even
+  though the build succeeded.
+- Release notes are generated from `CHANGELOG.md` and both CI and the release
+  job now refuse to publish when that section is missing or empty.
 
 ## [1.1.0] - 2026-11-03
 

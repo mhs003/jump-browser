@@ -586,13 +586,24 @@ class DownloadRepository(
         }
     }
 
+    /**
+     * Re-reads the system download manager.
+     *
+     * This is a binder round trip per download plus the stored metadata, so it
+     * runs on IO: it used to be called from `onResume`, which put it directly
+     * on the launch path.
+     */
     fun refresh() {
+        scope.launch {
+            val result = queryAll()
+            tasks = result
+        }
+    }
+
+    private fun queryAll(): List<DownloadTask> {
         val meta = loadMeta()
         val ids = meta.map { it.id }.toLongArray()
-        if (ids.isEmpty()) {
-            tasks = emptyList()
-            return
-        }
+        if (ids.isEmpty()) return emptyList()
         val out = mutableListOf<DownloadTask>()
         runCatching {
             manager.query(DownloadManager.Query().setFilterById(*ids)).use { c: Cursor ->
@@ -627,10 +638,10 @@ class DownloadRepository(
                 }
             }
         }
-        tasks = out.sortedByDescending { it.createdAt }
         if (out.none { it.state == DownloadState.PENDING || it.state == DownloadState.RUNNING || it.state == DownloadState.PAUSED }) {
             running = false
         }
+        return out.sortedByDescending { it.createdAt }
     }
 
     fun remove(id: Long) {

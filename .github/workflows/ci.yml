@@ -29,8 +29,11 @@ jobs:
           if [ -z "$version" ]; then
             echo "::error::version.properties has no version"; exit 1
           fi
-          if ! grep -qE "^## \[${version//./\\.}\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$version]' section"
+          # The release body is generated from this section, so an empty one
+          # would publish a release with no notes.
+          notes="$(bash .github/release-notes.sh "$version" 2>/dev/null | tr -d '[:space:]')"
+          if [ -z "$notes" ]; then
+            echo "::error::CHANGELOG.md has no (or an empty) '## [$version]' section"
             exit 1
           fi
 

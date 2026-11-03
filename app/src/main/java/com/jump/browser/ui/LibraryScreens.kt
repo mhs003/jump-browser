@@ -56,7 +56,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import com.jump.browser.ui.theme.Icon
 import com.jump.browser.ui.theme.MaterialTheme
 import com.jump.browser.ui.theme.Surface
-import com.jump.browser.ui.theme.ripple
 import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1717,7 +1716,7 @@ fun JumpOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
             .height(43.dp)
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = com.jump.browser.ui.theme.JumpRippleIndication,
+                indication = com.jump.browser.ui.theme.JumpPressIndication,
                 onClick = onClick,
             ),
         verticalAlignment = Alignment.CenterVertically,
