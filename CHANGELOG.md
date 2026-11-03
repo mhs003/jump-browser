@@ -10,6 +10,12 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-03
+
+### Changed
+
+- Maintenance release: build, tooling and dependency updates only.
+
 ## [1.1.2] - 2026-11-03
 
 ### Changed
