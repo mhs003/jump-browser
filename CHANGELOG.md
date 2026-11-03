@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-03
+
 ### Fixed
 
 - Startup is consistently under a second again: the system download manager
