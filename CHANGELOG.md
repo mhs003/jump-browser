@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-03
+
 ### Fixed
 
 - Dark mode now darkens pages the way Chromium intends: the engine's
