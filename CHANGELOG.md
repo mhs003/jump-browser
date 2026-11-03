@@ -10,6 +10,10 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-03
+
+No user-facing changes.
+
 ## [1.1.0] - 2026-11-03
 
 ### Fixed
