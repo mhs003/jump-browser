@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-03
+
 ### Added
 
 - Long-pressing the home button focuses the address bar.
