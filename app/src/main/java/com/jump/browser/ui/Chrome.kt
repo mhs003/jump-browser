@@ -371,10 +371,20 @@ fun FullScreenAddressBar(
         ) {
             BasicTextField(
                 value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
+                // Multi-line on purpose: long addresses wrap and the whole
+                // display becomes the editing canvas. A newline is never
+                // part of an address — Enter submits instead of breaking.
+                onValueChange = { changed ->
+                    if (!changed.text.contains('\n')) {
+                        onValueChange(changed)
+                    } else {
+                        onValueChange(TextFieldValue(changed.text.replace("\n", "")))
+                        onSubmit()
+                    }
+                },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = 16.sp,
+                    lineHeight = 26.sp,
                     color = MaterialTheme.colorScheme.onBackground,
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -384,14 +394,15 @@ fun FullScreenAddressBar(
                 ),
                 keyboardActions = KeyboardActions(onGo = { onSubmit() }),
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .focusRequester(focusRequester),
                 decorationBox = { inner ->
-                    Box(Modifier.fillMaxWidth()) {
+                    Box(Modifier.fillMaxSize()) {
                         if (value.text.isEmpty()) {
                             Text(
                                 "Search",
                                 fontSize = 16.sp,
+                                lineHeight = 26.sp,
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
                         }

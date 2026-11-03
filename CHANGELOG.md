@@ -10,6 +10,16 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Changed
+
+- The find-in-page bar now rides directly on the keyboard while typing and
+  docks back above the bottom bar when the keyboard closes; it used to
+  hover a toolbar's height above the keyboard with the page showing
+  through the gap.
+- The full-screen address bar wraps long addresses across lines and the
+  whole screen becomes the editing canvas, instead of one scrolling line
+  over an empty display. Enter still submits.
+
 ## [1.2.3] - 2026-11-03
 
 ### Fixed

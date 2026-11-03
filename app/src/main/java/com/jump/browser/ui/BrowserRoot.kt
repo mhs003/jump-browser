@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
@@ -581,21 +582,6 @@ fun BrowserRoot(
                     },
                 )
 
-                if (findVisible) {
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding()) {
-                        FindBar(
-                            query = findQuery,
-                            onQuery = {
-                                findQuery = it
-                                controller.findAll(it)
-                            },
-                            matches = controller.findState,
-                            onNext = { controller.findNext(true) },
-                            onPrev = { controller.findNext(false) },
-                            onClose = { closeFind() },
-                        )
-                    }
-                }
             }
             if (!bottomToolbar) {
                 BottomBar(
@@ -1055,6 +1041,36 @@ fun BrowserRoot(
                 ) {
                     SourceScreen(it, sourceTitle) { source = null }
                 }
+            }
+        }
+
+        // Find in page lives at the window so its anchor can choose between
+        // the bottom bar (keyboard away) and the keyboard itself (typing):
+        // hosted inside the content box it ended up hovering one toolbar's
+        // height above the keyboard, with page showing through the gap.
+        if (findVisible && !(editing && fullScreenAddress)) {
+            val imeBottomPx = WindowInsets.ime.getBottom(density)
+            val dockBottomPx = maxOf(
+                imeBottomPx,
+                if (settings.toolbarPosition != "TOP") bottomInsetPx else navInsetPx,
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = with(density) { dockBottomPx.toDp() }),
+            ) {
+                FindBar(
+                    query = findQuery,
+                    onQuery = {
+                        findQuery = it
+                        controller.findAll(it)
+                    },
+                    matches = controller.findState,
+                    onNext = { controller.findNext(true) },
+                    onPrev = { controller.findNext(false) },
+                    onClose = { closeFind() },
+                )
             }
         }
 
