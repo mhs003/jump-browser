@@ -1687,7 +1687,10 @@ class BrowserController(
 
     private fun saveState() {
         if (!app.settings.settings.restoreTabs) return
-        val saved = sessions.values.filter { !it.info.incognito && it.info.url != null }
+        val saved = sessions.values.filter { session ->
+            val url = session.info.url
+            !session.info.incognito && url != null && isPersistableUrl(url)
+        }
         val activeIndex = saved.indexOfFirst { it.info.id == activeId }.coerceAtLeast(0)
         app.tabs.save(
             saved.map {
@@ -1702,6 +1705,12 @@ class BrowserController(
         )
     }
 
+    // Both sides of the tab snapshot must see the same sessions: restore drops
+    // non-http/file URLs, so if save kept them the persisted active index would
+    // shift and the wrong tab would come back to the foreground.
+    private fun isPersistableUrl(url: String): Boolean =
+        url.startsWith("http") || url.startsWith("file")
+
     private fun restoreTabs() {
         // Via keeps the incognito mode across restarts but never restores tabs
         // into it: the session starts empty so nothing leaks to disk.
@@ -1711,7 +1720,7 @@ class BrowserController(
             return
         }
         val (snapshots, activeIndex) = app.tabs.load()
-        val restorable = snapshots.filter { it.url.startsWith("http") || it.url.startsWith("file") }
+        val restorable = snapshots.filter { isPersistableUrl(it.url) }
         if (restorable.isEmpty()) {
             newTab(null, incognito = false)
             return

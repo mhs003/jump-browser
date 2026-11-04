@@ -10,6 +10,13 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+### Fixed
+
+- Tab restore no longer mis-activates a tab after process death when a
+  one-off scheme (`about:` etc.) was part of the saved set: the save side
+  now persists exactly the sessions restore keeps, so the recorded active
+  index always matches the restored list.
+
 ## [1.2.4] - 2026-11-04
 
 ### Changed
