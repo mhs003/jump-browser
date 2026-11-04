@@ -286,6 +286,18 @@ class AddressBarView(
             addView(chromeIconView(context, glyph, palette.onSurface))
         }
 
+    /** Called once when the editor appears: caret in the field, keyboard up. */
+    fun focusForEditing(text: String) {
+        if (field.text.toString() != text) {
+            field.setText(text)
+        }
+        field.setSelection(text.length)
+        field.requestFocus()
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+            as? android.view.inputmethod.InputMethodManager
+        imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+
     fun setTextExternal(text: String, cursorAtEnd: Boolean) {
         if (field.text.toString() != text) {
             suppress = true
@@ -1198,5 +1210,208 @@ class ToastHostView(context: Context) : FrameLayout(context) {
         pendingDismiss = dismiss
         postDelayed(dismiss, request.duration)
         shownId = request.id
+    }
+}
+
+/**
+ * Suggestions dropdown under the address bar: the current page row (favicon,
+ * title + url), then up to eight matching rows at 56dp, in a card that
+ * bottoms out with 20dp rounded corners and caps at 360dp.
+ */
+class SuggestionDropdownView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onPick: (Int?) -> Unit,
+) : LinearLayout(context) {
+
+    private val rows = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+        )
+    }
+    private val scroll = ScrollView(context)
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(palette.surface)
+        // Round only the bottom corners: 20dp bottom start/end.
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height + 20f.cdp(context), 20f.cdp(context).toFloat())
+            }
+        }
+        scroll.isVerticalScrollBarEnabled = false
+        scroll.addView(rows)
+        addView(scroll, LayoutParams(
+            LayoutParams.MATCH_PARENT, (360 * resources.displayMetrics.density).toInt() + 1, 1f,
+        ))
+    }
+
+    /**
+     * Renders the full list; the row actions dispatch by index.
+     * [current] carries the tab whose row, when [showCurrent] is true, sits
+     * first (tap tag "C"), followed by suggestion rows (tap tag = index).
+     */
+    fun bind(current: TabInfo?, showCurrent: Boolean, suggestions: List<SearchSuggestion>) {
+        rows.removeAllViews()
+        if (current != null && showCurrent) {
+            rows.addView(row(
+                faviconOf = { faviconView(context, current, 24, palette.onBackground) },
+                title = current.title.ifBlank { "Page" },
+                subtitle = current.url,
+                onClick = { onPick(null) },
+            ))
+            if (suggestions.isNotEmpty()) {
+                rows.addView(View(context), LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1,
+                ).also { lp -> (lp as LinearLayout.LayoutParams).topMargin = 1 })
+                rows.addView(View(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 1,
+                    )
+                    setBackgroundColor(palette.outlineVariant)
+                })
+            }
+        }
+        suggestions.forEach { suggestion ->
+            val key = when (suggestion.kind) {
+                SuggestionKind.BOOKMARK -> "bookmarksuggestion"
+                SuggestionKind.HISTORY -> "historysuggestion"
+                else -> "search"
+            }
+            rows.addView(row(
+                faviconOf = {
+                    chromeIconView(context, key, palette.onBackground).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                        )
+                    }
+                },
+                title = suggestion.text,
+                subtitle = suggestion.subtitle,
+                onClick = { onPick(suggestions.indexOf(suggestion)) },
+            ))
+        }
+    }
+
+    private fun row(
+        faviconOf: () -> View,
+        title: String,
+        subtitle: String?,
+        onClick: () -> Unit,
+    ): LinearLayout = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 56f.cdp(context),
+        )
+        isClickable = true
+        isFocusable = true
+        pressFeedback()
+        setOnClickListener { onClick() }
+        addView(FrameLayout(context).apply {
+            layoutParams = LayoutParams(48f.cdp(context), 48f.cdp(context))
+            addView(faviconOf())
+        })
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
+            addView(TextView(context).apply {
+                text = title
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(palette.onBackground)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            if (!subtitle.isNullOrBlank()) {
+                addView(TextView(context).apply {
+                    text = subtitle
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                    setTextColor(palette.onSurfaceVariant)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+            }
+        })
+        addView(FrameLayout(context).apply {
+            layoutParams = LayoutParams(48f.cdp(context), 48f.cdp(context))
+            gravity = Gravity.CENTER
+            addView(chromeIconView(context, "openarrow", palette.onBackground).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                )
+            })
+        })
+    }
+}
+
+/** Error page: globe, "Can't reach this page", reason, Try again pill. */
+class ErrorPageView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onRetry: () -> Unit,
+) : LinearLayout(context) {
+
+    private val reason = TextView(context)
+    private val retry = FrameLayout(context)
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setBackgroundColor(palette.background)
+        val d = 28f.cdp(context)
+        setPadding(d, d, d, d)
+        addView(chromeIconView(context, "globe", palette.onSurfaceVariant, sizeDp = 54))
+        addView(space(18))
+        addView(TextView(context).apply {
+            text = "Can't reach this page"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            setTextColor(palette.onBackground)
+        })
+        addView(space(8))
+        reason.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        reason.setTextColor(palette.onSurfaceVariant)
+        reason.gravity = Gravity.CENTER
+        reason.setLineSpacing(0f, 18f / 13f)
+        addView(reason)
+        addView(space(20))
+        retry.layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, 40f.cdp(context),
+        )
+        val btn = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+            background = filledRound(20f.cdp(context), palette.primary)
+            isClickable = true
+            isFocusable = true
+            pressFeedback(20f.cdp(context))
+            setOnClickListener { onRetry() }
+            addView(TextView(context).apply {
+                text = "Try again"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(24f.cdp(context), 0, 24f.cdp(context), 0)
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                )
+            })
+        }
+        retry.addView(btn)
+        addView(retry)
+    }
+
+    private fun space(dp: Int): View = View(context).apply {
+        layoutParams = LinearLayout.LayoutParams(1, dp.cdp(context))
+    }
+
+    fun bind(message: String?) {
+        reason.text = message ?: "Check your connection and try again."
     }
 }

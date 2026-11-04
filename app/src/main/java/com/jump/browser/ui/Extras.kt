@@ -1,5 +1,9 @@
 package com.jump.browser.ui
 
+import android.view.ViewGroup
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.viewinterop.AndroidView
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -174,33 +178,18 @@ fun ErrorPage(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .blockFallThrough()
-            .padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            ReferenceIcons.Globe,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(54.dp),
-        )
-        Spacer(Modifier.height(18.dp))
-        Text("Can't reach this page", fontSize = 20.sp)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            message ?: "Check your connection and try again.",
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            lineHeight = 18.sp,
-        )
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = onRetry) { Text("Try again") }
-    }
+    // Platform-View page (ChromeViews.kt).
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            ErrorPageView(ctx, ViewPalette.forChrome(dark), onRetry).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                )
+            }
+        },
+        update = { it.bind(message) },
+    )
 }
-

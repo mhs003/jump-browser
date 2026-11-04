@@ -1494,6 +1494,18 @@ private fun SearchEngineDialog(
 }
 
 @Composable
+private fun ActionFade(
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
+    AnimVis(
+        visible = visible,
+        enter = fadeIn(tween(240)),
+        exit = fadeOut(tween(240)),
+    ) { content() }
+}
+
+@Composable
 private fun AddressSuggestionsOverlay(
     visible: Boolean,
     active: TabInfo?,
@@ -1503,18 +1515,22 @@ private fun AddressSuggestionsOverlay(
     onCurrent: () -> Unit,
     onPick: (SearchSuggestion) -> Unit,
 ) {
-    AnimVis(
-        visible = visible,
-        enter = fadeIn(tween(240)),
-        exit = fadeOut(tween(240)),
-        modifier = modifier,
-    ) {
-        SuggestionDropdown(
-            current = active,
-            showCurrent = showCurrent,
-            suggestions = suggestions,
-            onCurrent = onCurrent,
-            onPick = onPick,
+    if (!visible) return
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    ActionFade(visible) {
+        AndroidView(
+            modifier = modifier.fillMaxWidth(),
+            factory = { ctx ->
+                SuggestionDropdownView(
+                    ctx,
+                    ViewPalette.forChrome(dark),
+                    onPick = { index ->
+                        if (index == null) onCurrent()
+                        else suggestions.getOrNull(index)?.let(onPick)
+                    },
+                )
+            },
+            update = { it.bind(active, showCurrent, suggestions) },
         )
     }
 }

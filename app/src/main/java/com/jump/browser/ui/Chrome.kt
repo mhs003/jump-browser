@@ -440,6 +440,10 @@ fun TopChrome(
                         address.alpha = 0f
                         address.animate().alpha(1f).setDuration(240).start()
                         title.animate().alpha(0f).setDuration(240).start()
+                        // Opening the editor puts the caret in the field and
+                        // raises the keyboard, like the composable version's
+                        // FocusRequester.
+                        address.focusForEditing(addressValue.text)
                     }
                     address.apply {
                         if (field.text.toString() != addressValue.text) {
