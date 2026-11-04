@@ -1549,7 +1549,7 @@ private fun timeLabel(epoch: Long): String =
     Instant.ofEpochMilli(epoch).atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
 
-private fun pickHomepageImage(context: android.content.Context, onPicked: (String) -> Unit) {
+internal fun pickHomepageImage(context: android.content.Context, onPicked: (String) -> Unit) {
     val activity = context as? com.jump.browser.MainActivity
     if (activity == null) {
         JumpToast.show(context, "Image selection is not available")
@@ -1588,7 +1588,7 @@ private fun clearMaskSummary(mask: Int): String {
 }
 
 /** Opens the system "default browser" chooser, as Via's row does. */
-private fun openDefaultBrowserSettings(context: android.content.Context) {
+internal fun openDefaultBrowserSettings(context: android.content.Context) {
     val intent = android.content.Intent(
         android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS,
     ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
