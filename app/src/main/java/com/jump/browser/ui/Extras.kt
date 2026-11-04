@@ -3,6 +3,10 @@ package com.jump.browser.ui
 import android.view.ViewGroup
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
