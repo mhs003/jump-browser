@@ -45,6 +45,11 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.util.TypedValue
+import androidx.compose.ui.graphics.toArgb
 import com.jump.browser.ui.theme.MaterialTheme
 import com.jump.browser.ui.theme.Text
 import androidx.compose.runtime.Composable
@@ -862,55 +867,62 @@ fun BrowserRoot(
             }
         }
 
+        val onBackgroundArgb = MaterialTheme.colorScheme.onBackground.toArgb()
         if (aiDialog) {
-            JumpAlertDialog(
-                onDismissRequest = { aiDialog = false },
-                title = { Text("AI summary") },
-                text = {
-                    // JumpAlertDialog already scrolls its content; adding
-                    // another scrollable here measured it with unbounded height
-                    // and crashed.
-                    androidx.compose.foundation.text.selection.SelectionContainer {
-                        Text(aiAnswer, fontSize = 14.sp)
-                    }
-                },
-                confirmButton = { JumpDialogButton(onClick = { aiDialog = false }) { Text("Close") } },
-            )
+            ViewAlert(
+                onDismiss = { aiDialog = false },
+                title = "AI summary",
+                buttons = listOf(Triple("Close", true) { aiDialog = false }),
+            ) { column ->
+                val message = TextView(context).apply {
+                    text = aiAnswer
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(onBackgroundArgb)
+                    setTextIsSelectable(this, true)
+                }
+                column.addView(message)
+            }
         }
 
         controller.pendingLogin?.let { pending ->
-            JumpAlertDialog(
-                onDismissRequest = { controller.dismissPendingLogin() },
-                title = { Text("Save password?") },
-                text = {
-                    Column {
-                        Text(
-                            "Jump can remember this login for ${pending.host}.",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(pending.username, fontSize = 16.sp)
-                        Text(
-                            "\u2022".repeat(pending.password.length.coerceAtMost(12)),
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Encrypted with this device's keystore. Not synced anywhere.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                confirmButton = {
-                    JumpDialogButton(onClick = { controller.acceptPendingLogin() }) { Text("Save") }
-                },
-                dismissButton = {
-                    JumpDialogButton(onClick = { controller.dismissPendingLogin() }) { Text("Not now") }
-                },
-            )
+            ViewAlert(
+                onDismiss = { controller.dismissPendingLogin() },
+                title = "Save password?",
+                buttons = listOf(
+                    Triple("Not now", false) { controller.dismissPendingLogin() },
+                    Triple("Save", true) { controller.acceptPendingLogin() },
+                ),
+            ) { column ->
+                val dark = false
+                column.addView(TextView(context).apply {
+                    text = "Jump can remember this login for ${pending.host}."
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(0x8A000000.toInt())
+                })
+                column.addView(TextView(context).apply {
+                    text = pending.username
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                    setTextColor(onBackgroundArgb)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = 8f.cdp(context) }
+                })
+                column.addView(TextView(context).apply {
+                    text = "\u2022".repeat(pending.password.length.coerceAtMost(12))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(0x8A000000.toInt())
+                })
+                column.addView(TextView(context).apply {
+                    text = "Encrypted with this device's keystore. Not synced anywhere."
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    setTextColor(0x8A000000.toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = 8f.cdp(context) }
+                })
+            }
         }
 
         if (shownPage != LibraryPage.NONE) {
@@ -1371,56 +1383,110 @@ fun BrowserRoot(
         }
     }
 
+    val onBackgroundArgb = MaterialTheme.colorScheme.onBackground.toArgb()
     if (aboutDialog) {
-        JumpAlertDialog(
-            onDismissRequest = { aboutDialog = false },
-            title = { Text("Jump") },
-            text = {
-                Column {
-                    Text("A fast, lightweight browser.", fontSize = 14.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Text("Version 1.0.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Kotlin · Jetpack Compose · Android WebView", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-            confirmButton = { JumpDialogButton(onClick = { aboutDialog = false }) { Text("Close") } },
-        )
+        ViewAlert(
+            onDismiss = { aboutDialog = false },
+            title = "Jump",
+            buttons = listOf(Triple("Close", true) { aboutDialog = false }),
+        ) { column ->
+            column.addView(TextView(context).apply {
+                text = "A fast, lightweight browser."
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(onBackgroundArgb)
+            })
+            column.addView(TextView(context).apply {
+                text = "Version 1.0.0"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextColor(0x8A000000.toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = 10f.cdp(context) }
+            })
+            column.addView(TextView(context).apply {
+                text = "Kotlin · Android Views · Android WebView"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                setTextColor(0x8A000000.toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = 4f.cdp(context) }
+            })
+        }
     }
 
     if (helpDialog) {
-        JumpAlertDialog(
-            onDismissRequest = { helpDialog = false },
-            title = { Text("Help") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("• Tap the address bar to search or enter a URL.", fontSize = 13.sp)
-                    Text("• Tap the bottom tab count to switch tabs.", fontSize = 13.sp)
-                    Text("• Long-press a link to open it in a new tab.", fontSize = 13.sp)
-                    Text("• Use the menu for reader mode, find in page and more.", fontSize = 13.sp)
-                }
-            },
-            confirmButton = { JumpDialogButton(onClick = { helpDialog = false }) { Text("Got it") } },
-        )
+        ViewAlert(
+            onDismiss = { helpDialog = false },
+            title = "Help",
+            buttons = listOf(Triple("Close", true) { helpDialog = false }),
+        ) { column ->
+            listOf(
+                "• Tap the address bar to search or enter a URL.",
+                "• Tap the bottom tab count to switch tabs.",
+                "• Long-press a link to open it in a new tab.",
+                "• Use the menu for reader mode, find in page and more.",
+            ).forEachIndexed { index, line ->
+                column.addView(TextView(context).apply {
+                    text = line
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    setTextColor(onBackgroundArgb)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = if (index == 0) 0 else 8f.cdp(context) }
+                })
+            }
+        }
     }
 
     if (clearDataDialog) {
-        JumpAlertDialog(
-            onDismissRequest = { clearDataDialog = false },
-            title = { Text("Clear data") },
-            text = { Text("Clear history, cookies and cached files?") },
-            confirmButton = {
-                JumpDialogButton(onClick = {
+        ViewAlert(
+            onDismiss = { clearDataDialog = false },
+            title = "Clear data",
+            buttons = listOf(
+                Triple("Cancel", false) { clearDataDialog = false },
+                Triple("Clear", true) {
                     controller.clearBrowsingData(true, true, true)
                     clearDataDialog = false
                     JumpToast.show(context, "Browsing data cleared")
-                }) { Text("Clear") }
-            },
-            dismissButton = { JumpDialogButton(onClick = { clearDataDialog = false }) { Text("Cancel") } },
-        )
+                },
+            ),
+        ) { column ->
+            column.addView(TextView(context).apply {
+                text = "Clear history, cookies and cached files?"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(onBackgroundArgb)
+            })
+        }
     }
 
     if (exitDialog) {
+        val dontAskState = remember { androidx.compose.runtime.mutableStateOf(false) }
+        ViewAlert(
+            onDismiss = { exitDialog = false },
+            title = "Exit",
+            buttons = listOf(
+                Triple("Cancel", false) { exitDialog = false },
+                Triple("Exit", true) {
+                    if (dontAskState.value) {
+                        container.settings.update { it.copy(confirmExit = false) }
+                    }
+                    exitDialog = false
+                    onExit()
+                },
+            ),
+        ) { column ->
+            column.addView(TextView(context).apply {
+                text = "All open tabs will be deleted and cannot be restored, are you sure you want to exit?"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(onBackgroundArgb)
+            })
+            column.addView(DotTickRow(context, onBackgroundArgb) { dontAskState.value = it })
+        }
+    }
+if (exitDialog) {
         var dontAsk by remember { mutableStateOf(false) }
         JumpAlertDialog(
             onDismissRequest = { exitDialog = false },
@@ -1475,22 +1541,42 @@ private fun SearchEngineDialog(
     onSelect: (String) -> Unit,
 ) {
     val options = com.jump.browser.data.SearchEngine.reference
-    JumpAlertDialog(
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Search engine") },
-        text = {
-            Column {
-                options.forEach { engine ->
-                    JumpOptionRow(
-                        label = engine.name,
-                        selected = engine.id == selected,
-                        onClick = { onSelect(engine.id) },
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        AndroidView(
+            modifier = Modifier
+                .padding(horizontal = 36.dp)
+                .fillMaxWidth(),
+            factory = { ctx ->
+                AlertView(
+                    ctx,
+                    ViewPalette.forChrome(dark),
+                    title = "Search engine",
+                    body = { column ->
+                        options.forEach { engine ->
+                            column.addView(OptionRowView(ctx).apply {
+                                bind(engine.name, engine.id == selected) {
+                                    onSelect(engine.id)
+                                    onDismiss()
+                                }
+                            })
+                        }
+                    },
+                    buttons = listOf(Triple("Cancel", false) { onDismiss() }),
+                ).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
                     )
                 }
-            }
-        },
-        confirmButton = {},
-    )
+            },
+        )
+    }
 }
 
 @Composable

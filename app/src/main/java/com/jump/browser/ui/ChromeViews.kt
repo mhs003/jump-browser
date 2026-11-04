@@ -1,5 +1,13 @@
 package com.jump.browser.ui
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import com.jump.browser.ui.theme.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -1815,4 +1823,246 @@ class BookmarkEditView(
             pressFeedback(18f.cdp(context))
             setOnClickListener { onClick() }
         }
+}
+
+/**
+ * The shared alert card: bold title, custom body, right-aligned buttons.
+ * Mirrors the composable JumpAlertDialog framing on platform Views.
+ */
+class AlertView(
+    context: Context,
+    private val palette: ViewPalette,
+    title: String,
+    body: (LinearLayout) -> Unit,
+    buttons: List<Triple<String, Boolean, () -> Unit>>,
+) : LinearLayout(context) {
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        background = filledRound(16f.cdp(context), palette.surface)
+        setPadding(24f.cdp(context), 18f.cdp(context), 24f.cdp(context), 8f.cdp(context))
+        addView(TextView(context).apply {
+            text = title
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(palette.onBackground)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = 10f.cdp(context) }
+        })
+        body(
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+                )
+            },
+        )
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+            buttons.forEach { (label, accent, onClick) ->
+                addView(TextView(context).apply {
+                    text = label
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(if (accent) palette.primary else palette.primary)
+                    gravity = Gravity.CENTER
+                    minWidth = 56f.cdp(context)
+                    minHeight = 48f.cdp(context)
+                    setPadding(8f.cdp(context), 0, 8f.cdp(context), 0)
+                    isClickable = true
+                    pressFeedback(18f.cdp(context))
+                    setOnClickListener { onClick() }
+                })
+            }
+        })
+    }
+
+    /** Standard message body: one selectable 14sp paragraph. */
+    fun message(text: CharSequence): TextView = TextView(context).apply {
+        this.text = text
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        setTextColor(palette.onBackground)
+        setTextIsSelectable(this, true)
+    }
+
+    /** Muted secondary paragraph for the fine print. */
+    fun note(text: CharSequence, sizeSp: Float = 12f): TextView = TextView(context).apply {
+        this.text = text
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        setTextColor(palette.onSurfaceVariant)
+    }
+
+    /** Tick row for confirmations like the exit checkbox. */
+    fun tickRow(label: String, initial: Boolean, onToggle: (Boolean) -> Unit): View {
+        var checked = initial
+        val box = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(18f.cdp(context), 18f.cdp(context))
+        }
+        fun repaint() {
+            box.background = if (checked) filledRound(3f.cdp(context), palette.primary)
+            else strokedRound(3f.cdp(context), 1.5f.cdp(context), 0xFFC2C2C2.toInt())
+        }
+        repaint()
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { checked = !checked; repaint(); onToggle(checked) }
+            addView(box)
+            addView(TextView(context).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(palette.onBackground)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { leftMargin = 12f.cdp(context) }
+            })
+        }
+    }
+
+    /** Option row for pickers like the search engine dialog. */
+    fun optionRow(label: String, selected: Boolean, onClick: () -> Unit): View =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 43f.cdp(context),
+            )
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onClick() }
+            addView(View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(20f.cdp(context), 20f.cdp(context))
+                background = if (selected) filledOval(palette.primary)
+                else strokedRound(10f.cdp(context), 1.5f.cdp(context), 0xFFC2C2C2.toInt())
+            })
+            addView(TextView(context).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextColor(palette.onBackground)
+                layoutParams = LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
+                ).apply { leftMargin = 20f.cdp(context) }
+            })
+        }
+}
+
+/** Compose-side host: dialog window whose content is the View alert card. */
+@Composable
+fun ViewAlert(
+    onDismiss: () -> Unit,
+    title: String,
+    buttons: List<Triple<String, Boolean, () -> Unit>>,
+    body: (LinearLayout) -> Unit,
+) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        AndroidView(
+            modifier = Modifier
+                .padding(horizontal = 36.dp)
+                .fillMaxWidth(),
+            factory = { ctx ->
+                AlertView(ctx, ViewPalette.forChrome(dark), title, body, buttons).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                }
+            },
+        )
+    }
+}
+
+/** Simple checkbox row for view-hosted dialogs. */
+class DotTickRow(
+    context: Context,
+    tint: Int,
+    onToggle: (Boolean) -> Unit,
+) : LinearLayout(context) {
+
+    init {
+        var checked = false
+        val box = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(18f.cdp(context), 18f.cdp(context))
+        }
+        fun repaint() {
+            box.background = if (checked) filledRound(3f.cdp(context), 0xFF6F8DE1.toInt())
+            else strokedRound(3f.cdp(context), 1.5f.cdp(context), 0xFFC2C2C2.toInt())
+        }
+        repaint()
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = 12f.cdp(context) }
+        isClickable = true
+        isFocusable = true
+        pressFeedback()
+        setOnClickListener { checked = !checked; repaint(); onToggle(checked) }
+        addView(box)
+        addView(TextView(context).apply {
+            text = "Don't remind me again"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(tint)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { leftMargin = 12f.cdp(context) }
+        })
+    }
+}
+
+/** Radio option row used by pickers built on the shared alert card. */
+class OptionRowView(context: Context) : LinearLayout(context) {
+
+    private val dot = View(context).apply {
+        layoutParams = LinearLayout.LayoutParams(20f.cdp(context), 20f.cdp(context))
+    }
+    private val label = TextView(context)
+    private var fire: (() -> Unit)? = null
+    private var isSelectedRow = false
+
+    init {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 43f.cdp(context),
+        )
+        isClickable = true
+        isFocusable = true
+        pressFeedback()
+        addView(dot)
+        addView(label.apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            layoutParams = LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
+            ).apply { leftMargin = 20f.cdp(context) }
+        })
+        setOnClickListener { fire?.invoke() }
+    }
+
+    fun bind(name: String, selected: Boolean, onClick: () -> Unit) {
+        label.text = name
+        isSelectedRow = selected
+        fire = onClick
+        repaint()
+    }
+
+    private fun repaint() {
+        dot.background = if (isSelectedRow) filledOval(0xFF6F8DE1.toInt())
+        else strokedRound(10f.cdp(context), 1.5f.cdp(context), 0xFFC2C2C2.toInt())
+    }
 }
