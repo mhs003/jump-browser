@@ -1048,63 +1048,77 @@ fun BrowserRoot(
                         },
                         update = { it.submit(savedPages) },
                     )
-                    LibraryPage.SETTINGS -> SettingsScreen(
-                        settings = settings,
-                        onBack = { page = LibraryPage.NONE },
-                        onExportBookmarks = { html ->
-                            pendingExport = Triple("text/html", "bookmarks.html", html)
-                            runCatching { exportLauncher.launch("bookmarks.html") }
-                        },
-                        onExportData = {
-                            val backup = com.jump.browser.data.Backup.build(
-                                settings = container.settings.exportJson(),
-                                bookmarks = container.bookmarks.bookmarks,
-                                history = container.history.entries,
-                            )
-                            pendingExport = Triple("application/json", "jump-backup.json", backup)
-                            runCatching { exportLauncher.launch("jump-backup.json") }
-                        },
-                        onImportData = {
-                            importCallback = null
-                            pendingImport = true
-                            runCatching { importLauncher.launch(arrayOf("application/json", "*/*")) }
-                        },
-                        logins = container.passwords.logins,
-                        onRemoveLogin = { container.passwords.remove(it) },
-                        onClearLogins = { container.passwords.clear() },
-                        scripts = container.scripts.scripts,
-                        onAddScript = { source ->
-                            val script = container.scripts.add(source)
-                            JumpToast.show(context, "Added \"${script.name}\"")
-                            controller.reload()
-                        },
-                        onRemoveScript = { id ->
-                            container.scripts.remove(id)
-                            controller.reload()
-                        },
-                        onToggleScript = { id, enabled ->
-                            container.scripts.setEnabled(id, enabled)
-                            controller.reload()
-                        },
-                        onImportBookmarks = { done ->
-                            importCallback = done
-                            runCatching { importLauncher.launch(arrayOf("text/html", "text/plain", "*/*")) }
-                        },
-                        onSettingsChange = { transform ->
-                            container.settings.update(transform)
-                            controller.applySettingsToAll()
-                        },
-                        onClearData = {
-                            // Wipes exactly what the dialog ticked, then
-                            // reloads the tabs so nothing stale is on screen.
-                            controller.clearData(container.settings.settings.clearDataMask)
-                            page = LibraryPage.NONE
-                        },
-                        controllerSetIncognito = { enabled ->
-                            controller.setIncognitoMode(enabled)
-                        },
-                        onAbout = { aboutDialog = true },
-                    )
+                    LibraryPage.SETTINGS -> {
+                        val chromeDark = when (settings.toolbarColor) {
+                            "DARK" -> true
+                            "LIGHT" -> false
+                            else -> dark
+                        }
+                        var settingsInCategory by remember { mutableStateOf(false) }
+                        var settingsHost by remember { mutableStateOf<SettingsViewHost?>(null) }
+                        BackHandler(enabled = settingsInCategory) { settingsHost?.onNavigateBack() }
+                        AndroidView(
+                            factory = { ctx ->
+                                SettingsViewHost(
+                                    ctx,
+                                    ViewPalette.forChrome(chromeDark),
+                                    settings,
+                                    onBack = { page = LibraryPage.NONE },
+                                    onSettingsChange = { transform ->
+                                        container.settings.update(transform)
+                                        controller.applySettingsToAll()
+                                    },
+                                    onClearData = {
+                                        // Wipes exactly what the dialog ticked, then
+                                        // reloads the tabs so nothing stale is on screen.
+                                        controller.clearData(container.settings.settings.clearDataMask)
+                                        page = LibraryPage.NONE
+                                    },
+                                    onAbout = { aboutDialog = true },
+                                    onImportBookmarks = { done ->
+                                        importCallback = done
+                                        runCatching { importLauncher.launch(arrayOf("text/html", "text/plain", "*/*")) }
+                                    },
+                                    onExportData = {
+                                        val backup = com.jump.browser.data.Backup.build(
+                                            settings = container.settings.exportJson(),
+                                            bookmarks = container.bookmarks.bookmarks,
+                                            history = container.history.entries,
+                                        )
+                                        pendingExport = Triple("application/json", "jump-backup.json", backup)
+                                        runCatching { exportLauncher.launch("jump-backup.json") }
+                                    },
+                                    onImportData = {
+                                        importCallback = null
+                                        pendingImport = true
+                                        runCatching { importLauncher.launch(arrayOf("application/json", "*/*")) }
+                                    },
+                                    scripts = container.scripts.scripts,
+                                    onAddScript = { source ->
+                                        val script = container.scripts.add(source)
+                                        JumpToast.show(context, "Added \"${script.name}\"")
+                                        controller.reload()
+                                    },
+                                    onRemoveScript = { id ->
+                                        container.scripts.remove(id)
+                                        controller.reload()
+                                    },
+                                    onToggleScript = { id, enabled ->
+                                        container.scripts.setEnabled(id, enabled)
+                                        controller.reload()
+                                    },
+                                    logins = container.passwords.logins,
+                                    onRemoveLogin = { container.passwords.remove(it) },
+                                    onClearLogins = { container.passwords.clear() },
+                                    controllerSetIncognito = { enabled ->
+                                        controller.setIncognitoMode(enabled)
+                                    },
+                                    onCategoryChanged = { settingsInCategory = it },
+                                ).also { settingsHost = it }
+                            },
+                            update = { it.submit(settings, container.scripts.scripts, container.passwords.logins) },
+                        )
+                    }
                     LibraryPage.NONE -> Unit
                 }
             }
