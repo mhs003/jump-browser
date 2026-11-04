@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -933,12 +934,26 @@ fun BrowserRoot(
                         onDeleteHistory = { container.history.delete(it) },
                         onClearHistory = { container.history.clear() },
                     )
-                    LibraryPage.DOWNLOADS -> DownloadsScreen(
-                        tasks = downloads,
-                        onBack = { page = LibraryPage.NONE },
-                        onOpen = { openDownload(context, it) },
-                        onDelete = { container.downloads.remove(it) },
-                        onClearCompleted = { container.downloads.clearCompleted() },
+                    LibraryPage.DOWNLOADS -> AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
+                        factory = { ctx ->
+                            val chromeDark = when (settings.toolbarColor) {
+                                "DARK" -> true
+                                "LIGHT" -> false
+                                else -> dark
+                            }
+                            DownloadsViewHost(
+                                ctx,
+                                DownloadsViewHost.Palette.forChrome(chromeDark),
+                                onBack = { page = LibraryPage.NONE },
+                                onOpen = { openDownload(ctx, it) },
+                                onDelete = { container.downloads.remove(it) },
+                            )
+                        },
+                        update = { it.submitTasks(downloads) },
                     )
                     LibraryPage.SNIFFER -> ResourceSnifferScreen(
                         // Reading the revision makes the panel recompose as the
