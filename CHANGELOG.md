@@ -10,6 +10,8 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-11-04
+
 ### Fixed
 
 - Tab restore no longer mis-activates a tab after process death when a
