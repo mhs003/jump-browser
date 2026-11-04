@@ -1055,3 +1055,61 @@ data class MenuEntryV(
     val accent: Boolean,
     val actionName: String,
 )
+
+/** The title long-press menu: Copy / Paste / Paste & Go in a 48dp pill. */
+class TitleActionPopupView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onCopy: () -> Unit,
+    private val onPaste: () -> Unit,
+    private val onPasteAndGo: () -> Unit,
+) : LinearLayout(context) {
+
+    private val copyAction = TextView(context)
+
+    init {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = filledRound(17f.cdp(context), palette.outlineVariant)
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, 17f.cdp(context).toFloat())
+            }
+        }
+        val hp = 18f.cdp(context)
+        setPadding(hp, 0, hp, 0)
+        copyAction.apply {
+            text = "Copy"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(palette.onBackground)
+            setPadding(16f.cdp(context), 0, 16f.cdp(context), 0)
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onCopy() }
+        }
+        addView(copyAction, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, 48f.cdp(context),
+        ))
+        addView(titleAction("Paste") { onPaste() })
+        addView(titleAction("Paste & Go") { onPasteAndGo() })
+    }
+
+    private fun titleAction(label: String, onClick: () -> Unit): TextView =
+        TextView(context).apply {
+            text = label
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(palette.onBackground)
+            gravity = Gravity.CENTER
+            setPadding(16f.cdp(context), 0, 16f.cdp(context), 0)
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onClick() }
+        }
+
+    fun bind(showCopy: Boolean) {
+        copyAction.visibility = if (showCopy) View.VISIBLE else View.GONE
+    }
+}

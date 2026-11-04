@@ -207,20 +207,22 @@ fun TitleActionPopup(
     onPasteAndGo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier
-            .height(48.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(17.dp))
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (showCopy) TitleAction("Copy", onCopy)
-        TitleAction("Paste", onPaste)
-        TitleAction("Paste & Go", onPasteAndGo)
-    }
-}
-
-@Composable
+    // Platform-View pill (ChromeViews.kt).
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            TitleActionPopupView(
+                ctx,
+                ViewPalette.forChrome(dark),
+                onCopy = onCopy,
+                onPaste = onPaste,
+                onPasteAndGo = onPasteAndGo,
+            )
+        },
+        update = { it.bind(showCopy) },
+    )
+}@Composable
 private fun TitleAction(label: String, onClick: () -> Unit) {
     Box(
         Modifier
