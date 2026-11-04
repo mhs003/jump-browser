@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -85,74 +86,10 @@ object JumpToast {
 @Composable
 fun JumpToastHost(modifier: Modifier = Modifier) {
     val request = JumpToast.current
-
-    // The host keeps rendering the outgoing message while the exit animation
-    // runs; the visible state is intentionally not cleared with the request.
-    var visibleData by remember { mutableStateOf<JumpToastData?>(null) }
-    LaunchedEffect(request) {
-        if (request != null) visibleData = request
-    }
-    LaunchedEffect(request?.id) {
-        val id = request?.id ?: return@LaunchedEffect
-        delay(request?.duration ?: 1600L)
-        JumpToast.dismissIf(id)
-    }
-
-    val density = LocalDensity.current
-    val lift = with(density) { 20.dp.roundToPx() }
-    Box(
-        modifier
-            .fillMaxSize()
-            .padding(bottom = with(density) { 76.dp }),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        AnimatedVisibility(
-            visible = request != null,
-            enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { lift },
-            exit = fadeOut(tween(180)) + slideOutVertically(tween(180)) { lift },
-        ) {
-            val data = visibleData ?: return@AnimatedVisibility
-            Row(
-                Modifier
-                    .widthIn(max = 360.dp)
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(Color(0xCC1E1E1E))
-                    .padding(start = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                BasicText(
-                    text = data.text,
-                    style = TextStyle(
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Start,
-                    ),
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .padding(vertical = 9.dp),
-                )
-                data.action?.let { label ->
-                    BasicText(
-                        text = label,
-                        style = TextStyle(
-                            color = JumpAccent,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .jumpClickable {
-                                data.onAction?.invoke()
-                                JumpToast.dismiss()
-                            }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                }
-                if (data.action == null) {
-                    Box(Modifier.padding(end = 16.dp))
-                }
-            }
-        }
-    }
+    // Platform-View pill (ChromeViews.kt) over the same toast bus.
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx -> ToastHostView(ctx) },
+        update = { it.bind(request) },
+    )
 }

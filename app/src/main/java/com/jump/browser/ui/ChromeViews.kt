@@ -1113,3 +1113,90 @@ class TitleActionPopupView(
         copyAction.visibility = if (showCopy) View.VISIBLE else View.GONE
     }
 }
+
+/**
+ * The in-app toast pill: dark rounded capsule above the bottom bar, 14sp
+ * white text, optional accent action, 1.6s/3.5s durations. Reads the same
+ * JumpToast bus the View screens already post to.
+ */
+class ToastHostView(context: Context) : FrameLayout(context) {
+
+    private var pendingDismiss: Runnable? = null
+    private var shownId = 0L
+
+    private val pill = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = filledRound(30f.cdp(context), 0xCC1E1E1E.toInt())
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, 30f.cdp(context).toFloat())
+            }
+        }
+        setPadding(16f.cdp(context), 0, 0, 0)
+    }
+
+    private val message = TextView(context).apply {
+        setTextColor(Color.WHITE)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        includeFontPadding = false
+        isSingleLine = false
+        maxLines = 3
+        setPadding(0, 9f.cdp(context), 0, 9f.cdp(context))
+    }
+
+    private val actionView = TextView(context).apply {
+        setTextColor(0xFF6F8DE1.toInt())
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        isClickable = true
+        isFocusable = true
+        pressFeedback(18f.cdp(context))
+        setPadding(16f.cdp(context), 12f.cdp(context), 16f.cdp(context), 12f.cdp(context))
+    }
+
+    init {
+        pill.addView(message, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
+        ))
+        pill.addView(actionView)
+        addView(pill, FrameLayout.LayoutParams(
+            (360f.cdp(context)), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+        ))
+    }
+
+    fun bind(request: JumpToastData?) {
+        if (request == null) {
+            pill.animate().alpha(0f).translationY(20f.cdp(context).toFloat())
+                .setDuration(180).start()
+            return
+        }
+        pill.removeAllViews()
+        message.text = request.text
+        pill.addView(message, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT, 1f,
+        ))
+        if (request.action != null) {
+            actionView.text = request.action
+            actionView.setOnClickListener {
+                request.onAction?.invoke()
+                JumpToast.dismiss()
+            }
+            actionView.visibility = View.VISIBLE
+        } else {
+            View(context).apply {
+                layoutParams = LayoutParams(16f.cdp(context), 1)
+            }.let { pill.addView(it) }
+            actionView.visibility = View.GONE
+        }
+        pill.alpha = 0f
+        pill.translationY = 20f.cdp(context).toFloat()
+        pill.animate().alpha(1f).translationY(0f).setDuration(180).start()
+        pendingDismiss?.let { removeCallbacks(it) }
+        val dismiss = Runnable { JumpToast.dismissIf(request.id) }
+        pendingDismiss = dismiss
+        postDelayed(dismiss, request.duration)
+        shownId = request.id
+    }
+}
