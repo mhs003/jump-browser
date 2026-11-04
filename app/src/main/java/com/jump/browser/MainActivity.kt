@@ -147,4 +147,14 @@ class MainActivity : ComponentActivity() {
         controller = null
         super.onDestroy()
     }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        com.jump.browser.ui.QrScannerView.onPermissionsResult(requestCode, grantResults)
+    }
+
 }

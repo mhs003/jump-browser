@@ -67,149 +67,21 @@ fun QrScannerScreen(
     onBack: () -> Unit,
     onResult: (String) -> Unit,
 ) {
-    val context = LocalContext.current
-    var granted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        granted = it
-    }
-
-    LaunchedEffect(Unit) {
-        if (!granted) permission.launch(Manifest.permission.CAMERA)
-    }
-
-    val handled = remember { AtomicBoolean(false) }
-    // Created during composition, not in a DisposableEffect: the effect runs
-    // after the first composition, which is exactly when AndroidView already
-    // called its factory, so the surface callback would have had nothing to
-    // attach to and the preview stayed black.
-    val preview = remember(granted) {
-        if (!granted) {
-            null
-        } else {
-            QrPreview(context) { value ->
-                if (handled.compareAndSet(false, true)) onResult(value)
-            }
-        }
-    }
-
-    DisposableEffect(preview) {
-        onDispose { preview?.close() }
-    }
-
-    // No opaque background on this Box: a SurfaceView is composited behind the
-    // window, so any Compose background painted here would cover the preview.
-    Box(Modifier.fillMaxSize()) {
-        if (granted) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    // TextureView rather than SurfaceView: it renders inside
-                    // the normal view tree, so it composes with the Compose
-                    // overlay instead of being a separate layer the window
-                    // background can cover.
-                    android.view.TextureView(ctx).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                        )
-                        // The surface only exists once the view is attached, so
-                        // start there rather than in the factory.
-                        surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(
-                                t: android.graphics.SurfaceTexture,
-                                w: Int,
-                                h: Int,
-                            ) {
-                                preview?.attach(t)
-                            }
-
-                            override fun onSurfaceTextureSizeChanged(
-                                t: android.graphics.SurfaceTexture,
-                                w: Int,
-                                h: Int,
-                            ) = Unit
-
-                            override fun onSurfaceTextureDestroyed(t: android.graphics.SurfaceTexture): Boolean {
-                                preview?.closeCamera()
-                                return true
-                            }
-
-                            override fun onSurfaceTextureUpdated(t: android.graphics.SurfaceTexture) = Unit
-                        }
-                    }
-                },
-                update = { view ->
-                    // `factory` runs once. When the permission arrives later the
-                    // view already exists, so attach the newly created preview
-                    // if the surface is already there.
-                    val current = preview
-                    if (current != null && view.tag !== current) {
-                        view.tag = current
-                        view.surfaceTexture?.let(current::attach)
-                    }
-                },
-            )
-            QrFrameOverlay()
-        } else {
-            Column(
-                Modifier.fillMaxSize().padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(ReferenceIcons.QrScan, null, tint = Color.White, modifier = Modifier.size(58.dp))
-                Spacer(Modifier.height(18.dp))
-                Text("Camera access is needed to scan QR codes", color = Color.White, fontSize = 17.sp)
-                Spacer(Modifier.height(18.dp))
-                Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) {
-                    Text("Allow camera")
-                }
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { pasteLink(context, onResult) }) {
-                    Text("Paste a link instead", color = Color(0xFF9AAEEF))
-                }
-            }
-        }
-
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(48.dp)
-                .background(Color.Black.copy(alpha = 0.35f)),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ChromeButton(
-                icon = ReferenceIcons.Back,
-                contentDescription = "Back",
-                tint = Color.White,
-                onClick = onBack,
-            )
-            Text("Scan QR code", color = Color.White, fontSize = 19.sp)
-        }
-
-        if (granted) {
-            TextButton(
-                onClick = { pasteLink(context, onResult) },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 72.dp),
-            ) {
-                Text("Paste a link instead", color = Color(0xFFCCD6FF), fontSize = 14.sp)
-            }
-        }
-    }
+    // Camera runs camera2 + TextureView inside a platform View (QrScannerView);
+    // only this thin AndroidView wrapper remains in Compose.
+    AndroidView(
+        factory = { ctx ->
+            QrScannerView(ctx, onBack, onResult)
+        },
+        update = { },
+    )
 }
 
 /**
  * Owns the camera device, the preview surface and the YUV reader. Everything
  * runs on a single background thread and is torn down in [close].
  */
-private class QrPreview(
+internal class QrPreview(
     private val context: Context,
     private val onDecoded: (String) -> Unit,
 ) {
@@ -376,7 +248,7 @@ private class QrPreview(
     }
 }
 
-private fun pasteLink(context: Context, onResult: (String) -> Unit) {
+internal fun pasteLink(context: Context, onResult: (String) -> Unit) {
     val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val text = clip.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
     if (text.isNotBlank()) onResult(text)
