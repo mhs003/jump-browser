@@ -1684,7 +1684,9 @@ private fun ContextMenuOverlay(
     onShare: () -> Unit,
     onDownload: () -> Unit,
 ) {
-    AnimVis(visible = true, enter = fadeIn(tween(100)), exit = fadeOut(tween(100))) {
+    // Platform-View sheet inside the Compose scrim (fares below during purge).
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    ActionFade(visible = true) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -1696,43 +1698,54 @@ private fun ContextMenuOverlay(
                 ) { onDismiss() },
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Surface(
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                    ) { },
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            ) {
-                Column {
-                    Text(
-                        menu.linkUrl?.let { UrlUtils.displayHost(it) }
-                            ?: menu.imageUrl?.let { UrlUtils.displayHost(it) }
-                            ?: "Link",
-                        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp, end = 20.dp),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+            AndroidView(
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+                factory = { ctx ->
+                    fun group(label: String, key: String) = label to key
+                    val linkRows = if (menu.linkUrl != null) listOf(
+                        group("Open in new tab", "plus"),
+                        group("Open in background", "tabs"),
+                        group("Copy link", "linecopy"),
+                        group("Share link", "share"),
+                    ) else emptyList()
+                    val imageRows = if (menu.imageUrl != null) listOf(
+                        group("Open image", "showimages"),
+                        group("Download image", "download"),
+                        group("Copy image address", "linecopy"),
+                        group("Share image", "share"),
+                    ) else emptyList()
+                    ContextMenuView(
+                        ctx,
+                        ViewPalette.forChrome(dark),
+                        listOf(linkRows, imageRows),
+                        onAction = { gi, ri ->
+                            when (gi) {
+                                0 -> when (ri) {
+                                    0 -> onOpenNew()
+                                    1 -> onOpenBackground()
+                                    2 -> onCopy()
+                                    3 -> onShare()
+                                }
+                                1 -> when (ri) {
+                                    0 -> onOpenNew()
+                                    1 -> onDownload()
+                                    2 -> onCopy()
+                                    3 -> onShare()
+                                }
+                            }
+                            onDismiss()
+                        },
+                        onDismissMenu = onDismiss,
                     )
-                    if (menu.linkUrl != null) {
-                        ContextRow(ReferenceIcons.Plus, "Open in new tab", onOpenNew)
-                        ContextRow(ReferenceIcons.Tabs, "Open in background", onOpenBackground)
-                        ContextRow(JumpIcons.Copy, "Copy link", onCopy)
-                        ContextRow(ReferenceIcons.Share, "Share link", onShare)
-                    }
-                    if (menu.imageUrl != null) {
-                        ContextRow(ReferenceIcons.ShowImages, "Open image", onOpenNew)
-                        ContextRow(ReferenceIcons.Download, "Download image", onDownload)
-                        ContextRow(JumpIcons.Copy, "Copy image address", onCopy)
-                        ContextRow(ReferenceIcons.Share, "Share image", onShare)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
+                },
+                update = {
+                    it.bind(
+                        menu.linkUrl?.let { com.jump.browser.browser.UrlUtils.displayHost(it) }
+                            ?: menu.imageUrl?.let { com.jump.browser.browser.UrlUtils.displayHost(it) }
+                            ?: "Link",
+                    )
+                },
+            )
         }
     }
 }
@@ -1767,36 +1780,48 @@ private fun ToolsDialog(
     onFind: () -> Unit,
     onAskAi: () -> Unit,
 ) {
-    JumpAlertDialog(
+    // Platform-View card (ChromeViews.kt) in the dialog window.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Tools") },
-        text = {
-            Column {
-                ToolRow(JumpIcons.Reader, "Reader mode", onReader)
-                ToolRow(ReferenceIcons.Find, "Find in page", onFind)
-                ToolRow(JumpIcons.Copy, "View source", onSource)
-                ToolRow(ReferenceIcons.Translate, "Translate", onTranslate)
-                ToolRow(JumpIcons.Printer, "Print", onPrint)
-                ToolRow(JumpIcons.Info, "Page info", onPageInfo)
-                ToolRow(JumpIcons.Reader, "Ask AI about this page", onAskAi)
-            }
-        },
-        confirmButton = { JumpDialogButton(onClick = onDismiss) { Text("Close") } },
-    )
-}
-
-@Composable
-private fun ToolRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .pressable { onClick() }
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+        ),
     ) {
-        ChromeIcon(icon, null, size = 21)
-        Spacer(Modifier.size(16.dp))
-        Text(title, fontSize = 15.sp)
+        AndroidView(
+            modifier = Modifier
+                .padding(horizontal = 36.dp)
+                .fillMaxWidth(),
+            factory = { ctx ->
+                ToolsDialogView(
+                    ctx,
+                    ViewPalette.forChrome(dark),
+                    listOf(
+                        "linereader" to "Reader mode",
+                        "find" to "Find in page",
+                        "linecopy" to "View source",
+                        "translate" to "Translate",
+                        "lineprinter" to "Print",
+                        "lineinfo" to "Page info",
+                        "linereader" to "Ask AI about this page",
+                    ),
+                    onRow = { i ->
+                        when (i) {
+                            0 -> onReader()
+                            1 -> onFind()
+                            2 -> onSource()
+                            3 -> onTranslate()
+                            4 -> onPrint()
+                            5 -> onPageInfo()
+                            6 -> onAskAi()
+                        }
+                        onDismiss()
+                    },
+                    onDismissTools = onDismiss,
+                )
+            },
+            update = { },
+        )
     }
 }
 

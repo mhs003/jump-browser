@@ -147,18 +147,32 @@ fun filledOval(color: Int): Drawable = object : Drawable() {
     override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
 }
 
-/** Fills a traced 88-unit glyph at any size; the path is parsed once. */
-class GlyphView(context: Context, pathData: String, tint: Int) : View(context) {
+/**
+ * Draws a glyph at any size; the path is parsed once. Traced reference icons
+ * fill an 88-unit box; the line icons use a 24-unit box with a stroke.
+ */
+class GlyphView(
+    context: Context,
+    pathData: String,
+    tint: Int,
+    private val viewport: Float = 88f,
+    private val strokeWidthDp: Float = 0f,
+) : View(context) {
     private val path: Path = PathParser.createPathFromPathData(pathData)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
         color = tint
+        style = if (strokeWidthDp > 0f) Paint.Style.STROKE else Paint.Style.FILL
+        if (strokeWidthDp > 0f) {
+            strokeWidth = strokeWidthDp * resources.displayMetrics.density
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         val size = width.coerceAtMost(height).toFloat()
         canvas.save()
-        canvas.scale(size / 88f, size / 88f)
+        canvas.scale(size / viewport, size / viewport)
         canvas.drawPath(path, paint)
         canvas.restore()
     }
@@ -412,3 +426,14 @@ class ThinProgress(context: Context, track: Int, fill: Int) : View(context) {
         }
     }
 }
+
+/** Top-rounded fill: bottom sheets and dropdown cards. */
+fun filledRoundTop(radiusPx: Int, color: Int): android.graphics.drawable.GradientDrawable =
+    android.graphics.drawable.GradientDrawable().apply {
+        setColor(color)
+        cornerRadii = floatArrayOf(
+            radiusPx.toFloat(), radiusPx.toFloat(),
+            radiusPx.toFloat(), radiusPx.toFloat(),
+            0f, 0f, 0f, 0f,
+        )
+    }

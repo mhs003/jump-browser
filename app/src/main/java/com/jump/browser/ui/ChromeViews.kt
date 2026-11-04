@@ -1518,3 +1518,141 @@ class FindBarView(
         }
     }
 }
+
+/** Line-icon variant: 24-unit stroked glyph like the JumpIcons set. */
+fun lineIconView(context: Context, key: String, tint: Int, sizeDp: Int = 21): View =
+    GlyphView(context, ReferenceIcons.paths.getValue(key), tint, viewport = 24f, strokeWidthDp = 1.55f * sizeDp / 24f).apply {
+        layoutParams = FrameLayout.LayoutParams(sizeDp.cdp(context), sizeDp.cdp(context))
+    }
+
+/**
+ * Web context menu: scrim, bottom card with the rounded top, host header,
+ * and the action rows for links/images.
+ */
+class ContextMenuView(
+    context: Context,
+    private val palette: ViewPalette,
+    rowGroups: List<List<Pair<String, String>>>,
+    private val onAction: (Int, Int) -> Unit,
+    private val onDismissMenu: () -> Unit,
+) : LinearLayout(context) {
+
+    private val header = TextView(context)
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        background = filledRoundTop(20f.cdp(context), palette.surface)
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height + 20f.cdp(context), 20f.cdp(context).toFloat())
+            }
+        }
+        layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+        )
+        header.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        header.setTextColor(palette.onSurfaceVariant)
+        header.maxLines = 1
+        header.ellipsize = android.text.TextUtils.TruncateAt.END
+        header.setPadding(20f.cdp(context), 16f.cdp(context), 20f.cdp(context), 8f.cdp(context))
+        addView(header)
+        rowGroups.forEachIndexed { gi, rows ->
+            rows.forEachIndexed { ri, row ->
+                addView(contextRow(row.second, row.first) { onAction(gi, ri) })
+            }
+        }
+        addView(View(context), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 10f.cdp(context),
+        ))
+    }
+
+    fun bind(headerText: String) {
+        header.text = headerText
+    }
+
+    private fun contextRow(key: String, label: String, onClick: () -> Unit): LinearLayout =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onClick() }
+            addView(lineIconView(context, key, palette.onBackground))
+            addView(TextView(context).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTextColor(palette.onBackground)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { leftMargin = 18f.cdp(context) }
+            })
+            setPadding(20f.cdp(context), 13f.cdp(context), 20f.cdp(context), 13f.cdp(context))
+        }
+}
+
+/** Tools dialog rows inside the JumpAlertDialog framing, on Views. */
+class ToolsDialogView(
+    context: Context,
+    private val palette: ViewPalette,
+    rows: List<Pair<String, String>>,
+    private val onRow: (Int) -> Unit,
+    private val onDismissTools: () -> Unit,
+) : LinearLayout(context) {
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        background = filledRound(16f.cdp(context), palette.surface)
+        clipChildren = false
+        val title = TextView(context).apply {
+            text = "Tools"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(palette.onBackground)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(24f.cdp(context), 20f.cdp(context), 24f.cdp(context), 8f.cdp(context))
+        }
+        addView(title)
+        rows.forEachIndexed { i, row ->
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                isClickable = true
+                isFocusable = true
+                pressFeedback()
+                setOnClickListener { onRow(i) }
+                addView(lineIconView(context, row.first, palette.onBackground))
+                addView(TextView(context).apply {
+                    text = row.second
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                    setTextColor(palette.onBackground)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { leftMargin = 18f.cdp(context) }
+                })
+                setPadding(24f.cdp(context), 11f.cdp(context), 24f.cdp(context), 11f.cdp(context))
+            })
+        }
+        addView(View(context), LinearLayout.LayoutParams(1, 6f.cdp(context)))
+        addView(TextView(context).apply {
+            text = "Close"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(palette.primary)
+            gravity = Gravity.CENTER
+            isClickable = true
+            pressFeedback(18f.cdp(context))
+            setPadding(16f.cdp(context), 12f.cdp(context), 16f.cdp(context), 12f.cdp(context))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { gravity = Gravity.END; setPadding(0, 0, 8f.cdp(context), 8f.cdp(context)) }
+            gravity = Gravity.END
+            setOnClickListener { onDismissTools() }
+        })
+    }
+}
