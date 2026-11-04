@@ -495,3 +495,115 @@ class BottomBarView(
         }
     }
 }
+
+/**
+ * Full-screen address editor: the whole display is the editing canvas, long
+ * addresses wrap, Enter submits, and the collapse/go row rides the keyboard.
+ */
+class FullScreenAddressBarView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onValueChange: (String) -> Unit,
+    private val onSubmit: () -> Unit,
+    private val onCollapse: () -> Unit,
+) : LinearLayout(context) {
+
+    val field = EditText(context)
+
+    init {
+        orientation = VERTICAL
+        setBackgroundColor(palette.background)
+        layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+        // Status bar above, keyboard/nav bar below — the composable version
+        // used statusBarsPadding + imePadding; here insets do it directly.
+        setOnApplyWindowInsetsListener { v, insets ->
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val sys = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+                val ime = insets.getInsets(android.view.WindowInsets.Type.ime())
+                v.setPadding(0, sys.top, 0, maxOf(sys.bottom, ime.bottom))
+            } else {
+                @Suppress("DEPRECATION")
+                v.setPadding(0, insets.systemWindowInsetTop, 0, insets.stableInsetBottom)
+            }
+            android.view.WindowInsets.CONSUMED
+        }
+
+        field.background = null
+        field.hint = "Search"
+        field.setHintTextColor(palette.onSurfaceVariant)
+        field.setTextColor(palette.onBackground)
+        field.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+        field.gravity = Gravity.TOP or Gravity.START
+        field.imeOptions = EditorInfo.IME_ACTION_GO
+        field.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+            android.text.InputType.TYPE_TEXT_VARIATION_URI or
+            android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        field.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                val text = s?.toString().orEmpty()
+                if (!text.contains('\n')) {
+                    onValueChange(text)
+                } else {
+                    val cleaned = text.replace("\n", "")
+                    field.setText(cleaned)
+                    field.setSelection(cleaned.length)
+                    onSubmit()
+                }
+            }
+        })
+        field.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_GO) {
+                onSubmit(); true
+            } else false
+        }
+        addView(field, LayoutParams(
+            LayoutParams.MATCH_PARENT, 0, 1f,
+        ).apply { setMargins(16f.cdp(context), 14f.cdp(context), 16f.cdp(context), 0) })
+
+        val row = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 64f.cdp(context),
+            ).apply { setMargins(12f.cdp(context), 0, 12f.cdp(context), 0) }
+            val collapse = FrameLayout(context).apply {
+                layoutParams = LayoutParams(48f.cdp(context), 48f.cdp(context))
+                isClickable = true
+                isFocusable = true
+                pressFeedback()
+                setOnClickListener { onCollapse() }
+                addView(chromeIconView(context, "expand", palette.onSurface).apply {
+                    rotation = 180f
+                })
+            }
+            addView(collapse)
+            addView(View(context).apply {
+                layoutParams = LayoutParams(0, 1, 1f)
+            })
+            addView(View(context).apply {
+                layoutParams = LayoutParams(48f.cdp(context), 48f.cdp(context))
+                isClickable = true
+                isFocusable = true
+                pressFeedback()
+                setOnClickListener { onSubmit() }
+                addView(chromeIconView(context, "forward", palette.onSurface))
+            })
+        }
+        addView(row)
+    }
+
+    fun focus(text: String) {
+        if (field.text.toString() != text) {
+            field.setText(text)
+        }
+        field.setSelection(text.length)
+        field.requestFocus()
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+            as? android.view.inputmethod.InputMethodManager
+        imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+}

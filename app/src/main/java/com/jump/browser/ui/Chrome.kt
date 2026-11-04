@@ -357,90 +357,24 @@ fun FullScreenAddressBar(
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .blockFallThrough()
-            .statusBarsPadding()
-            .imePadding(),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(start = 16.dp, end = 16.dp, top = 14.dp),
-        ) {
-            BasicTextField(
-                value = value,
-                // Multi-line on purpose: long addresses wrap and the whole
-                // display becomes the editing canvas. A newline is never
-                // part of an address — Enter submits instead of breaking.
-                onValueChange = { changed ->
-                    if (!changed.text.contains('\n')) {
-                        onValueChange(changed)
-                    } else {
-                        onValueChange(TextFieldValue(changed.text.replace("\n", "")))
-                        onSubmit()
-                    }
+    // Platform-View editor (ChromeViews.kt). statusBars/ime padding come from
+    // the window insets the Activity already distributes.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            FullScreenAddressBarView(
+                ctx,
+                ViewPalette.forChrome(dark),
+                onValueChange = { text ->
+                    onValueChange(androidx.compose.ui.text.input.TextFieldValue(text))
                 },
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    fontSize = 16.sp,
-                    lineHeight = 26.sp,
-                    color = MaterialTheme.colorScheme.onBackground,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Go,
-                ),
-                keyboardActions = KeyboardActions(onGo = { onSubmit() }),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .focusRequester(focusRequester),
-                decorationBox = { inner ->
-                    Box(Modifier.fillMaxSize()) {
-                        if (value.text.isEmpty()) {
-                            Text(
-                                "Search",
-                                fontSize = 16.sp,
-                                lineHeight = 26.sp,
-                                color = MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
-                        inner()
-                    }
-                },
+                onSubmit = onSubmit,
+                onCollapse = onCollapse,
             )
-        }
-        Row(
-            Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .jumpClickable { onCollapse() },
-                contentAlignment = Alignment.Center,
-            ) {
-                ChromeIcon(
-                    ReferenceIcons.Expand,
-                    "Collapse address bar",
-                    size = 22,
-                    modifier = Modifier.rotate(180f),
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            ChromeButton(
-                icon = ReferenceIcons.Forward,
-                contentDescription = "Go",
-                size = 22,
-                onClick = onSubmit,
-            )
-        }
-    }
+        },
+        update = { it.focus(value.text) },
+    )
 }
 
 @Composable
