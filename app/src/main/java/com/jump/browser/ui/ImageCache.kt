@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import java.io.File
 
@@ -32,6 +33,10 @@ object ImageCache {
      * Returns a bitmap for [path] scaled so its shortest edge is at least
      * [minEdge], or null when the file is absent or not an image.
      */
+    /** Raw-bitboard accessor for the view-hosted screens. */
+    fun loadBitmap(path: String?, minEdge: Int = 64): Bitmap? =
+        load(path, minEdge)?.asAndroidBitmap()
+
     fun load(path: String?, minEdge: Int = 64): ImageBitmap? {
         if (path.isNullOrBlank()) return null
         val key = "$path@$minEdge"

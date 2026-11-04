@@ -922,17 +922,34 @@ fun BrowserRoot(
                 color = MaterialTheme.colorScheme.background,
             ) {
                 when (shownPage) {
-                    LibraryPage.RECORDS -> RecordsScreen(
-                        initialTab = recordsTab,
-                        bookmarks = bookmarks,
-                        history = history,
-                        onBack = { page = LibraryPage.NONE },
-                        onOpen = { controller.loadUrl(it); page = LibraryPage.NONE },
-                        onDeleteBookmark = { container.bookmarks.remove(it) },
-                        onEditBookmark = { editingBookmark = it },
-                        onAddBookmark = { title, url -> container.bookmarks.add(title, url) },
-                        onDeleteHistory = { container.history.delete(it) },
-                        onClearHistory = { container.history.clear() },
+                    LibraryPage.RECORDS -> AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
+                        factory = { ctx ->
+                            val chromeDark = when (settings.toolbarColor) {
+                                "DARK" -> true
+                                "LIGHT" -> false
+                                else -> dark
+                            }
+                            RecordsViewHost(
+                                ctx,
+                                ViewPalette.forChrome(chromeDark),
+                                initialTab = recordsTab,
+                                onBack = { page = LibraryPage.NONE },
+                                onOpen = {
+                                    controller.loadUrl(it)
+                                    page = LibraryPage.NONE
+                                },
+                                onDeleteBookmark = { container.bookmarks.remove(it) },
+                                onEditBookmark = { editingBookmark = it },
+                                onAddBookmark = { title, url -> container.bookmarks.add(title, url) },
+                                onDeleteHistory = { container.history.delete(it) },
+                                onClearHistory = { container.history.clear() },
+                            )
+                        },
+                        update = { it.submit(bookmarks, history) },
                     )
                     LibraryPage.DOWNLOADS -> AndroidView(
                         modifier = Modifier
@@ -947,7 +964,7 @@ fun BrowserRoot(
                             }
                             DownloadsViewHost(
                                 ctx,
-                                DownloadsViewHost.Palette.forChrome(chromeDark),
+                                ViewPalette.forChrome(chromeDark),
                                 onBack = { page = LibraryPage.NONE },
                                 onOpen = { openDownload(ctx, it) },
                                 onDelete = { container.downloads.remove(it) },
@@ -955,32 +972,78 @@ fun BrowserRoot(
                         },
                         update = { it.submitTasks(downloads) },
                     )
-                    LibraryPage.SNIFFER -> ResourceSnifferScreen(
-                        // Reading the revision makes the panel recompose as the
-                        // sniffer collects entries; the list itself is plain.
-                        resources = controller.panelsRevision.let { controller.sniffedResources },
-                        onBack = { page = LibraryPage.NONE },
-                        onOpen = { controller.navigate(it); page = LibraryPage.NONE },
-                        onDownload = { controller.downloadUrl(it) },
-                        onCopy = { controller.copyUrl(it) },
-                    )
-                    LibraryPage.NETWORK -> NetworkLogScreen(
-                        entries = controller.panelsRevision.let { controller.networkEntries },
-                        onBack = { page = LibraryPage.NONE },
-                        onClear = { controller.clearNetworkLog() },
-                        onOpen = { controller.copyUrl(it) },
-                    )
-                    LibraryPage.SAVED -> SavedPagesScreen(
-                        pages = savedPages,
-                        onBack = { page = LibraryPage.NONE },
-                        onOpen = { file ->
-                            page = LibraryPage.NONE
-                            controller.loadUrl("file://${file.absolutePath}")
+                    LibraryPage.SNIFFER -> AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
+                        factory = { ctx ->
+                            val chromeDark = when (settings.toolbarColor) {
+                                "DARK" -> true
+                                "LIGHT" -> false
+                                else -> dark
+                            }
+                            SnifferViewHost(
+                                ctx,
+                                ViewPalette.forChrome(chromeDark),
+                                onBack = { page = LibraryPage.NONE },
+                                onOpen = {
+                                    controller.navigate(it)
+                                    page = LibraryPage.NONE
+                                },
+                                onDownload = { controller.downloadUrl(it) },
+                                onCopy = { controller.copyUrl(it) },
+                            )
                         },
-                        onDelete = {
-                            it.delete()
-                            savedPages = loadSavedPages(context)
+                        update = { it.submit(controller.panelsRevision.let { controller.sniffedResources }) },
+                    )
+                    LibraryPage.NETWORK -> AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
+                        factory = { ctx ->
+                            val chromeDark = when (settings.toolbarColor) {
+                                "DARK" -> true
+                                "LIGHT" -> false
+                                else -> dark
+                            }
+                            NetworkViewHost(
+                                ctx,
+                                ViewPalette.forChrome(chromeDark),
+                                onBack = { page = LibraryPage.NONE },
+                                onClear = { controller.clearNetworkLog() },
+                                onOpen = { controller.copyUrl(it) },
+                            )
                         },
+                        update = { it.submit(controller.panelsRevision.let { controller.networkEntries }) },
+                    )
+                    LibraryPage.SAVED -> AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
+                        factory = { ctx ->
+                            val chromeDark = when (settings.toolbarColor) {
+                                "DARK" -> true
+                                "LIGHT" -> false
+                                else -> dark
+                            }
+                            SavedViewHost(
+                                ctx,
+                                ViewPalette.forChrome(chromeDark),
+                                onBack = { page = LibraryPage.NONE },
+                                onOpen = { file ->
+                                    page = LibraryPage.NONE
+                                    controller.loadUrl("file://${file.absolutePath}")
+                                },
+                                onDelete = {
+                                    it.delete()
+                                    savedPages = loadSavedPages(context)
+                                },
+                            )
+                        },
+                        update = { it.submit(savedPages) },
                     )
                     LibraryPage.SETTINGS -> SettingsScreen(
                         settings = settings,
