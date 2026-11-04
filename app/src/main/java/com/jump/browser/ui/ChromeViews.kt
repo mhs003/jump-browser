@@ -1415,3 +1415,106 @@ class ErrorPageView(
         reason.text = message ?: "Check your connection and try again."
     }
 }
+
+/**
+ * The find bar: 40dp pill with the query field, "n/m" counter, prev/next and
+ * close. Focus and keyboard arrive on appearance.
+ */
+class FindBarView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onQuery: (String) -> Unit,
+    private val onNext: () -> Unit,
+    private val onPrev: () -> Unit,
+    private val onClose: () -> Unit,
+) : LinearLayout(context) {
+
+    val field = EditText(context)
+    private val counter = TextView(context)
+    private val counterBox = LinearLayout(context)
+    private var suppress = false
+
+    init {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = filledRound(20f.cdp(context), palette.surface)
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, 20f.cdp(context).toFloat())
+            }
+        }
+        layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 40f.cdp(context),
+        )
+        setPadding(16f.cdp(context), 0, 4f.cdp(context), 0)
+        field.background = null
+        field.hint = "Find in page"
+        field.setHintTextColor(palette.onSurfaceVariant)
+        field.setTextColor(palette.onBackground)
+        field.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        field.includeFontPadding = false
+        field.setSingleLine(true)
+        field.imeOptions = EditorInfo.IME_ACTION_SEARCH
+        field.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                if (suppress) return
+                onQuery(s?.toString().orEmpty())
+                counterBox.visibility =
+                    if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
+            }
+        })
+        field.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                onNext(); true
+            } else false
+        }
+        addView(field, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        counterBox.orientation = LinearLayout.HORIZONTAL
+        counterBox.gravity = Gravity.CENTER_VERTICAL
+        counterBox.visibility = View.GONE
+        counter.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        counter.setTextColor(palette.onSurfaceVariant)
+        counterBox.addView(counter, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { setMargins(8f.cdp(context), 0, 8f.cdp(context), 0) })
+        counterBox.addView(findButtonSlot("chevronup") { onPrev() })
+        counterBox.addView(findButtonSlot("chevrondown") { onNext() })
+        addView(counterBox)
+        addView(findButtonSlot("close") { onClose() })
+    }
+
+    private fun findButtonSlot(glyph: String, onClick: () -> Unit): FrameLayout =
+        FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(48f.cdp(context), 48f.cdp(context))
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onClick() }
+            addView(chromeIconView(context, glyph, palette.onSurface).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                )
+            })
+        }
+
+    fun bind(query: String, matches: Pair<Int, Int>, focused: Boolean) {
+        if (field.text.toString() != query) {
+            suppress = true
+            field.setText(query)
+            suppress = false
+            field.setSelection(query.length)
+        }
+        counter.text = if (matches.second == 0) "0/0" else "${matches.first + 1}/${matches.second}"
+        counterBox.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE
+        if (focused) {
+            field.requestFocus()
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+                as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+}

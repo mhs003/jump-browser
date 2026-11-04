@@ -125,54 +125,26 @@ fun FindBar(
     onPrev: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Surface(
-        modifier = Modifier.fillMaxWidth().height(40.dp).blockFallThrough(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = 0.dp,
-    ) {
-        Row(
-            Modifier
-                .fillMaxSize()
-                .padding(start = 16.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.weight(1f)) {
-                if (query.isEmpty()) {
-                    Text("Find in page", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                BasicTextField(
-                    value = query,
-                    onValueChange = onQuery,
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { onNext() }),
-                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
-                )
-            }
-            if (query.isNotEmpty()) {
-                Text(
-                    if (matches.second == 0) "0/0" else "${matches.first + 1}/${matches.second}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
-                ChromeButton(ReferenceIcons.ChevronUp, "Previous match", size = 22, onClick = onPrev)
-                ChromeButton(ReferenceIcons.ChevronDown, "Next match", size = 22, onClick = onNext)
-            }
-            ChromeButton(ReferenceIcons.Close, "Close find", size = 22, onClick = onClose)
-        }
-    }
-}
-
-@Composable
+    // Platform-View pill (ChromeViews.kt); focus raised on first appearance.
+    var focusedOnce by remember { mutableStateOf(false) }
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    AndroidView(
+        factory = { ctx ->
+            FindBarView(
+                ctx,
+                ViewPalette.forChrome(dark),
+                onQuery = onQuery,
+                onNext = onNext,
+                onPrev = onPrev,
+                onClose = onClose,
+            )
+        },
+        update = {
+            it.bind(query, matches, focusedOnce)
+            focusedOnce = true
+        },
+    )
+}@Composable
 fun ErrorPage(
     message: String?,
     onRetry: () -> Unit,
