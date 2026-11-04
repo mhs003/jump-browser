@@ -34,6 +34,10 @@ fun Float.cdp(context: Context): Int =
 fun Int.cdp(context: Context): Int =
     (this * context.resources.displayMetrics.density + 0.5f).toInt()
 
+/** Recolors an (opaque) tint with a new alpha, like Compose's Color.copy. */
+fun tint(color: Int, alphaFraction: Float): Int =
+    (color and 0xFFFFFF) or (((alphaFraction * 255).toInt()) shl 24)
+
 fun chromeIconView(context: Context, name: String, tint: Int, sizeDp: Int = 22): GlyphView {
     val view = GlyphView(context, ReferenceIcons.paths.getValue(name), tint)
     val px = sizeDp.cdp(context)
@@ -810,3 +814,244 @@ class TabStripView(
         })
     }
 }
+
+/**
+ * The 214dp menu sheet: three swipeable pages of 5x2 grid cells, the page
+ * dots, and the exit/close footer overlapping the grid by 12dp. Same
+ * geometry as the composable MenuSheetContent it replaces.
+ */
+/**
+ * The 214dp menu sheet: three swipeable pages of 5x2 grid cells, the page
+ * dots, and the exit/close footer overlapping the grid by 12dp. Same
+ * geometry as the composable MenuSheetContent it replaces.
+ */
+class MenuSheetView(
+    context: Context,
+    private val palette: ViewPalette,
+    pages: List<List<MenuEntryV>>,
+    private val onActionCell: (String) -> Unit,
+    private val onExit: () -> Unit,
+    private val onDismiss: () -> Unit,
+) : LinearLayout(context) {
+
+    private val pagerRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private val scroller: HorizontalScrollView = object : HorizontalScrollView(context) {
+        override fun onScrollChanged(l: Int, t: Int, ol: Int, ot: Int) {
+            super.onScrollChanged(l, t, ol, ot)
+            settledListener?.invoke(
+                if (pagerWidth > 0) (l + pagerWidth / 2) / pagerWidth else 0,
+            )
+        }
+
+        override fun fling(velocityX: Int) { /* snapped on release instead */ }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            val handled = super.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_CANCEL
+            ) {
+                val limit = pagesRef.size.coerceAtLeast(1) - 1
+                val target = if (pagerWidth > 0) {
+                    ((scrollX + pagerWidth / 2) / pagerWidth).coerceIn(0, limit)
+                } else 0
+                smoothScrollTo(target * pagerWidth, 0)
+                settledListener?.invoke(target)
+            }
+            return handled
+        }
+    }
+    private var pagesRef = pages
+    private var pagerWidth = 0
+    private val dots = mutableListOf<View>()
+    private var settledListener: ((Int) -> Unit)? = null
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        background = filledRound(16f.cdp(context), palette.surface)
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, 16f.cdp(context).toFloat())
+            }
+        }
+        layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 214f.cdp(context),
+        )
+        setPadding(0, 6f.cdp(context), 0, 0)
+
+        scroller.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f,
+        )
+        scroller.isHorizontalScrollBarEnabled = false
+        scroller.addView(pagerRow, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT,
+        ))
+        addView(scroller, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f,
+        ))
+
+        val dotsRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 14f.cdp(context),
+            )
+        }
+        repeat(pages.size) { index ->
+            val dot = View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(4f.cdp(context), 4f.cdp(context)).apply {
+                    setMargins(4f.cdp(context), 0, 4f.cdp(context), 0)
+                }
+                isClickable = true
+                isFocusable = true
+                pressFeedback(oval = true)
+                setOnClickListener {
+                    settledListener?.invoke(index)
+                    scroller.smoothScrollTo(index * pagerWidth.coerceAtLeast(1), 0)
+                }
+            }
+            dots.add(dot)
+            dotsRow.addView(dot)
+        }
+        addView(dotsRow)
+
+        val footer = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 52f.cdp(context),
+            ).apply { topMargin = -12f.cdp(context) }
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            addView(footerButton("power") { onExit() })
+            addView(View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(24f.cdp(context), 1)
+            })
+            addView(footerButton("chevrondown") { onDismiss() })
+            addView(View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(8f.cdp(context), 1)
+            })
+        }
+        addView(footer)
+
+        buildPages()
+    }
+
+    private fun setDotSelected(dot: View, selected: Boolean) {
+        val color = if (selected) {
+            tint(palette.onSurface, 0.42f)
+        } else {
+            tint(palette.onSurface, 0.18f)
+        }
+        dot.background = filledOval(color)
+    }
+
+    private fun footerButton(glyph: String, onClick: () -> Unit): FrameLayout =
+        FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(48f.cdp(context), 48f.cdp(context))
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onClick() }
+            addView(chromeIconView(context, glyph, palette.onSurface).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER,
+                )
+            })
+        }
+
+    private fun buildPages() {
+        pagerRow.removeAllViews()
+        pagesRef.forEachIndexed { pageIndex, pageEntries ->
+            val page = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    if (pagerWidth > 0) pagerWidth else ViewGroup.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                )
+            }
+            pageEntries.chunked(5).take(2).forEach { rowEntries ->
+                page.addView(LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f,
+                    )
+                    rowEntries.forEach { entry ->
+                        addView(menuCell(entry))
+                    }
+                    repeat(5 - rowEntries.size) {
+                        addView(
+                            View(context),
+                            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f),
+                        )
+                    }
+                })
+            }
+            val params = pagerRow.layoutParams as FrameLayout.LayoutParams
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT
+            pagerRow.addView(page)
+        }
+        scroller.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                val w = scroller.width
+                if (w > 0 && w != pagerWidth) {
+                    pagerWidth = w
+                    for (i in 0 until pagerRow.childCount) {
+                        pagerRow.getChildAt(i).layoutParams = LinearLayout.LayoutParams(
+                            w, LinearLayout.LayoutParams.MATCH_PARENT,
+                        )
+                    }
+                }
+            }
+        })
+        settledListener = { p ->
+            dots.forEachIndexed { i, dot -> setDotSelected(dot, i == p) }
+        }
+        setDotSelected(dots.firstOrNull() ?: return, true)
+    }
+
+    fun bind(newPages: List<List<MenuEntryV>>) {
+        pagesRef = newPages
+        buildPages()
+    }
+
+    private fun menuCell(entry: MenuEntryV): LinearLayout {
+        val tint = if (entry.accent) palette.primary else palette.onBackground
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            setPadding(4f.cdp(context), 10f.cdp(context), 4f.cdp(context), 4f.cdp(context))
+            isClickable = true
+            isFocusable = true
+            pressFeedback(18f.cdp(context))
+            setOnClickListener { onActionCell(entry.actionName) }
+            addView(chromeIconView(context, entry.iconKey, tint).apply {
+                layoutParams = LinearLayout.LayoutParams(22f.cdp(context), 22f.cdp(context))
+            })
+            addView(TextView(context).apply {
+                text = entry.label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                includeFontPadding = false
+                setLineSpacing(0f, 13f / 12f)
+                setTextColor(tint)
+                gravity = Gravity.CENTER
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = 8f.cdp(context) }
+            })
+        }
+    }
+}
+
+/** View-side mirror of [MenuEntry] over the traced icon registry. */
+data class MenuEntryV(
+    val label: String,
+    val iconKey: String,
+    val accent: Boolean,
+    val actionName: String,
+)
