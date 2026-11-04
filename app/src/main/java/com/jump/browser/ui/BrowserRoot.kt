@@ -541,25 +541,28 @@ fun BrowserRoot(
                     }
                 }
                 if (active == null || active.isHome) {
-                    val homeOffset by animateFloatAsState(
-                        targetValue = if (homeDip) 1f else 0f,
-                        animationSpec = tween(120),
-                        label = "home-dip",
-                    )
-                    HomePage(
-                        bookmarks = bookmarks,
-                        onSearchClick = { startAddressEditing() },
-                        onBookmarkClick = { bookmark -> controller.loadUrl(bookmark.url) },
-                        onLogoClick = { recordsTab = 0; openPage(LibraryPage.RECORDS) },
-                        logoPath = settings.homepageLogoPath,
-                        backgroundPath = settings.homepageBackgroundPath,
-                        backgroundOpacity = settings.homepageBackgroundOpacity,
-                        searchBarEnabled = settings.homepageSearchBar,
-                        favoriteColorEnabled = settings.homepageFavoriteColor,
-                        modifier = Modifier.graphicsLayer {
-                            translationY = 72.dp.toPx() * homeOffset
-                            alpha = 1f - 0.9f * homeOffset
+                    val chromeDark = when (settings.toolbarColor) {
+                        "DARK" -> true
+                        "LIGHT" -> false
+                        else -> dark
+                    }
+                    AndroidView(
+                        factory = { ctx ->
+                            HomePageView(
+                                ctx,
+                                ViewPalette.forChrome(chromeDark),
+                                bookmarks,
+                                onSearchClick = { startAddressEditing() },
+                                onLogoClick = { recordsTab = 0; openPage(LibraryPage.RECORDS) },
+                                onBookmarkClick = { bookmark -> controller.loadUrl(bookmark.url) },
+                                logoPath = settings.homepageLogoPath,
+                                backgroundPath = settings.homepageBackgroundPath,
+                                backgroundOpacity = settings.homepageBackgroundOpacity,
+                                searchBarEnabled = settings.homepageSearchBar,
+                                favoriteColorEnabled = settings.homepageFavoriteColor,
+                            )
                         },
+                        update = { it.refresh(bookmarks) },
                     )
                 } else if (active.errorCode != null) {
                     ErrorPage(active.errorText, onRetry = { controller.reload() })
