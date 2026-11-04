@@ -756,7 +756,9 @@ fun TabPopup(
 ) {
     if (!visible) return
     // The window itself is sized to the page area, so the scrim fills exactly
-    // that strip and the chrome above and below keeps receiving taps.
+    // that strip and the chrome above and below keeps receiving taps. The
+    // card content is a platform View (ChromeViews.kt).
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     SheetWindow(
         onDismiss = onDismiss,
         contentTopPx = topInset,
@@ -777,53 +779,21 @@ fun TabPopup(
                 Surface(
                     Modifier
                         .fillMaxWidth()
-                        .widthIn(max = 600.dp)
-                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .blockFallThrough(),
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    tonalElevation = 0.dp,
+                        .widthIn(max = 600.dp),
+                    color = androidx.compose.ui.graphics.Color.Transparent,
                 ) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
-                        tabs.forEach { tab ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                                    .jumpClickable(androidx.compose.ui.graphics.RectangleShape) { onSelect(tab.id) },
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                                    Favicon(tab, 20)
-                                }
-                                Text(
-                                    text = tab.title.ifBlank { tab.url ?: "Homepage" },
-                                    modifier = Modifier.weight(1f),
-                                    fontSize = 14.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = if (tab.id == activeId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                    AndroidView(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                        factory = { ctx ->
+                            TabPopupView(ctx, ViewPalette.forChrome(dark), onSelect, onClose, onNewTab).apply {
+                                layoutParams = ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.WRAP_CONTENT,
                                 )
-                                Box(
-                                    Modifier.size(48.dp).jumpClickable {
-                                        onClose(tab.id)
-                                    },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    ChromeIcon(ReferenceIcons.Close, "Close tab", size = 20)
-                                }
                             }
-                        }
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .jumpClickable(androidx.compose.ui.graphics.RectangleShape) { onNewTab() },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ChromeIcon(ReferenceIcons.Plus, "New tab", size = 24)
-                        }
-                    }
+                        },
+                        update = { it.bind(tabs, activeId) },
+                    )
                 }
             }
         }
@@ -863,53 +833,13 @@ fun TabStrip(
     onNewTab: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .height(40.dp)
-            .horizontalScroll(rememberScrollState()),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tabs.forEach { tab ->
-            val selected = tab.id == activeId
-            Row(
-                Modifier
-                    .padding(horizontal = 2.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        } else {
-                            androidx.compose.ui.graphics.Color.Transparent
-                        },
-                    )
-                    .jumpClickable { onSelect(tab.id) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Favicon(tab, 14)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    tab.title.ifBlank { tab.url ?: "Homepage" },
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 110.dp),
-                )
-            }
-        }
-        Box(
-            Modifier
-                .size(36.dp)
-                .jumpClickable(onClick = onNewTab),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                ReferenceIcons.Plus,
-                contentDescription = "New tab",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
+    // Platform-View strip (ChromeViews.kt): scrolling pills, active highlight.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            TabStripView(ctx, ViewPalette.forChrome(dark), onSelect, onNewTab)
+        },
+        update = { it.bind(tabs, activeId) },
+    )
 }

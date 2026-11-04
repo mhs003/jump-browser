@@ -16,7 +16,10 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.jump.browser.browser.TabInfo
 
@@ -109,7 +112,7 @@ class TitleBarView(
     private val rightSlot = FrameLayout(context)
 
     init {
-        orientation = HORIZONTAL
+        orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setBackgroundColor(palette.background)
         layoutParams = LinearLayout.LayoutParams(
@@ -212,7 +215,7 @@ class AddressBarView(
     private var suppress = false
 
     init {
-        orientation = HORIZONTAL
+        orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setBackgroundColor(palette.background)
         layoutParams = LinearLayout.LayoutParams(
@@ -354,7 +357,7 @@ class BottomBarView(
     private val slots = mutableListOf<View>()
 
     init {
-        orientation = HORIZONTAL
+        orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setBackgroundColor(palette.background)
         layoutParams = LinearLayout.LayoutParams(
@@ -401,7 +404,7 @@ class BottomBarView(
         if (searchToolbar) {
             val pill = LinearLayout(context).apply {
                 layoutParams = LayoutParams(0, 48f.cdp(context), 2f)
-                orientation = HORIZONTAL
+                orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 val hp = 10f.cdp(context); val vp = 6f.cdp(context)
                 setPadding(hp, vp, hp, vp)
@@ -565,7 +568,7 @@ class FullScreenAddressBarView(
         ).apply { setMargins(16f.cdp(context), 14f.cdp(context), 16f.cdp(context), 0) })
 
         val row = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 64f.cdp(context),
@@ -605,5 +608,205 @@ class FullScreenAddressBarView(
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
             as? android.view.inputmethod.InputMethodManager
         imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+}
+
+/** A tab's favicon: live bitmap or the globe glyph, rounded 5dp. */
+fun faviconView(context: Context, tab: TabInfo, sizeDp: Int, tint: Int): View {
+    val size = sizeDp.cdp(context)
+    val box = FrameLayout(context)
+    box.layoutParams = FrameLayout.LayoutParams(size, size)
+    val bitmap = tab.favicon
+    if (bitmap != null && !bitmap.isRecycled) {
+        box.addView(android.widget.ImageView(context).apply {
+            setImageBitmap(bitmap)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, 5f.cdp(context).toFloat())
+                }
+            }
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+        })
+    } else {
+        box.addView(chromeIconView(context, "globe", tint, sizeDp = sizeDp - 4).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                (sizeDp - 4).cdp(context), (sizeDp - 4).cdp(context), Gravity.CENTER,
+            )
+        })
+    }
+    return box
+}
+
+/**
+ * Tab popup rows: 44dp per tab — favicon, one-line title (active in accent),
+ * 48dp close slot — and a 50dp new-tab slot. Hosted inside the sheet window.
+ */
+class TabPopupView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onSelect: (Long) -> Unit,
+    private val onClose: (Long) -> Unit,
+    private val onNewTab: () -> Unit,
+) : ScrollView(context) {
+
+    private val column = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+        )
+    }
+
+    init {
+        setBackgroundColor(palette.surface)
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(
+                    0, 0, view.width, view.height + 24f.cdp(context),
+                    24f.cdp(context).toFloat(),
+                )
+            }
+        }
+        isVerticalScrollBarEnabled = false
+        addView(column)
+        background = filledRound(24f.cdp(context), palette.surface)
+    }
+
+    fun bind(tabs: List<TabInfo>, activeId: Long?) {
+        column.removeAllViews()
+        tabs.forEach { tab ->
+            val selected = tab.id == activeId
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 44f.cdp(context),
+                )
+                isClickable = true
+                isFocusable = true
+                pressFeedback()
+                setOnClickListener { onSelect(tab.id) }
+                addView(FrameLayout(context).apply {
+                    layoutParams = LayoutParams(44f.cdp(context), 44f.cdp(context))
+                    addView(faviconView(context, tab, 20, palette.onBackground).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                        )
+                    })
+                })
+                addView(TextView(context).apply {
+                    text = tab.title.ifBlank { tab.url ?: "Homepage" }
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(if (selected) palette.primary else palette.onBackground)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                addView(FrameLayout(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(48f.cdp(context), 48f.cdp(context))
+                    isClickable = true
+                    isFocusable = true
+                    pressFeedback()
+                    setOnClickListener { onClose(tab.id) }
+                    addView(chromeIconView(context, "close", palette.onSurface, sizeDp = 20).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            20f.cdp(context), 20f.cdp(context), Gravity.CENTER,
+                        )
+                    })
+                })
+            }
+            column.addView(row)
+        }
+        column.addView(FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 50f.cdp(context),
+            )
+            isClickable = true
+            isFocusable = true
+            pressFeedback()
+            setOnClickListener { onNewTab() }
+            addView(chromeIconView(context, "plus", palette.onSurface, sizeDp = 24).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    24f.cdp(context), 24f.cdp(context), Gravity.CENTER,
+                )
+            })
+        })
+    }
+}
+
+/** The optional 40dp tab strip of the two-row toolbar. */
+class TabStripView(
+    context: Context,
+    private val palette: ViewPalette,
+    private val onSelect: (Long) -> Unit,
+    private val onNewTab: () -> Unit,
+) : HorizontalScrollView(context) {
+
+    private val row = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+        )
+    }
+
+    init {
+        setBackgroundColor(palette.background)
+        isHorizontalScrollBarEnabled = false
+        addView(row)
+    }
+
+    fun bind(tabs: List<TabInfo>, activeId: Long?) {
+        row.removeAllViews()
+        tabs.forEach { tab ->
+            val selected = tab.id == activeId
+            row.addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+                )
+                val hp = 2f.cdp(context); val vp = 4f.cdp(context)
+                lp.setMargins(hp, 0, hp, 0)
+                layoutParams = lp
+                setPadding(10f.cdp(context), vp, 10f.cdp(context), vp)
+                background = if (selected) filledRound(6f.cdp(context), palette.outlineVariant) else null
+                isClickable = true
+                isFocusable = true
+                pressFeedback(6f.cdp(context))
+                setOnClickListener { onSelect(tab.id) }
+                addView(faviconView(context, tab, 14, palette.onBackground))
+                addView(TextView(context).apply {
+                    text = tab.title.ifBlank { tab.url ?: "Homepage" }
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    setTextColor(palette.onBackground)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    layoutParams = LayoutParams(
+                        LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+                    ).apply { leftMargin = 6f.cdp(context) }
+                    width = 110f.cdp(context)
+                })
+            })
+        }
+        row.addView(FrameLayout(context).apply {
+            val lp = LinearLayout.LayoutParams(36f.cdp(context), 36f.cdp(context))
+            lp.setMargins(2f.cdp(context), 0, 2f.cdp(context), 0)
+            layoutParams = lp
+            isClickable = true
+            isFocusable = true
+            pressFeedback(6f.cdp(context))
+            setOnClickListener { onNewTab() }
+            addView(chromeIconView(context, "plus", palette.onSurface, sizeDp = 18).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    18f.cdp(context), 18f.cdp(context), Gravity.CENTER,
+                )
+            })
+        })
     }
 }
