@@ -55,6 +55,10 @@ import androidx.compose.foundation.verticalScroll
 import com.jump.browser.ui.theme.Icon
 import com.jump.browser.ui.theme.MaterialTheme
 import com.jump.browser.ui.theme.Text
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.FrameLayout
+import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -455,38 +459,72 @@ fun TopChrome(
     onSecureClick: () -> Unit,
     urlFieldContent: String = "TITLE",
 ) {
-    AnimatedContent(
-        targetState = editing,
-        transitionSpec = {
-            fadeIn(tween(240)) togetherWith fadeOut(tween(240))
-        },
-        label = "address",
-    ) { isEditing ->
-        if (isEditing) {
-            AddressBar(
-                value = addressValue,
-                onValueChange = onAddressValueChange,
-                onSubmit = onSubmitAddress,
-                onClose = onCloseAddress,
-                onExpand = onExpandAddress,
-                incognito = tab?.incognito == true,
-            )
-        } else {
-            TitleBar(
-                tab = tab,
-                bookmark = false,
-                urlFieldContent = urlFieldContent,
-                onOpenAddress = onOpenAddress,
-                onLeftClick = onLeftClick,
-                onRightClick = onRightClick,
-                onTitleLongClick = onTitleLongClick,
-                onSecureClick = onSecureClick,
-            )
-        }
+    // Now AndroidView-hosted platform views (see ChromeViews.kt); the address
+    // field cross-fades against the title bar over 240ms like the original.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    androidx.compose.runtime.key(tab?.incognito == true) {
+        AndroidView(
+            factory = { ctx ->
+                val palette = ViewPalette.forChrome(dark)
+                FrameLayout(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    val title = TitleBarView(
+                        ctx, palette,
+                        onOpenAddress = onOpenAddress,
+                        onLeftClick = onLeftClick,
+                        onRightClick = onRightClick,
+                        onTitleLongClick = onTitleLongClick,
+                        onSecureClick = onSecureClick,
+                    )
+                    val address = AddressBarView(
+                        ctx, palette,
+                        incognito = tab?.incognito == true,
+                        onValueChange = { text ->
+                            onAddressValueChange(androidx.compose.ui.text.input.TextFieldValue(text))
+                        },
+                        onSubmit = onSubmitAddress,
+                        onExpand = onExpandAddress,
+                    )
+                    address.visibility = android.view.View.GONE
+                    addView(title)
+                    addView(address)
+                    tag = title to address
+                }
+            },
+            update = { root ->
+                val (title, address) = root.tag as Pair<TitleBarView, AddressBarView>
+                title.bind(tab, urlFieldContent)
+                if (editing) {
+                    if (address.visibility != android.view.View.VISIBLE) {
+                        title.visibility = android.view.View.GONE
+                        address.visibility = android.view.View.VISIBLE
+                        address.alpha = 0f
+                        address.animate().alpha(1f).setDuration(240).start()
+                        title.animate().alpha(0f).setDuration(240).start()
+                    }
+                    address.apply {
+                        if (field.text.toString() != addressValue.text) {
+                            field.setText(addressValue.text)
+                            field.setSelection(addressValue.text.length)
+                        }
+                    }
+                } else {
+                    if (address.visibility != android.view.View.GONE) {
+                        address.visibility = android.view.View.GONE
+                        address.clearFocusAndKeyboard()
+                        title.visibility = android.view.View.VISIBLE
+                        title.alpha = 0f
+                        title.animate().alpha(1f).setDuration(240).start()
+                    }
+                }
+            },
+        )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BottomBar(
     tab: TabInfo?,
@@ -507,100 +545,40 @@ fun BottomBar(
     onSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val canBack = tab?.canGoBack == true
-    val canForward = tab?.canGoForward == true
-    val density = LocalDensity.current
-    // How far the bar slides under the finger before it commits.
-    val followLimitPx = with(density) { 56.dp.toPx() }
-    val commitDistancePx = with(density) { 40.dp.toPx() }
-    var offset by remember { mutableFloatStateOf(0f) }
-    val swipable = tabs.size > 1
-
-    // Drag the bar with the finger, then snap it back and switch tab in the
-    // same frame on release: no transition animation, as in Via.
-    val dragState = rememberDraggableState { delta ->
-        if (!swipable) return@rememberDraggableState
-        offset = (offset + delta).coerceIn(-followLimitPx, followLimitPx)
-    }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .height(48.dp)
-            .graphicsLayer { translationX = offset }
-            .draggable(
-                state = dragState,
-                orientation = Orientation.Horizontal,
-                startDragImmediately = false,
-                onDragStopped = { velocity ->
-                    if (!swipable) return@draggable
-                    val projected = offset + velocity * 0.05f
-                    offset = 0f
-                    when {
-                        projected < -commitDistancePx -> onSwitchTab(1)
-                        projected > commitDistancePx -> onSwitchTab(-1)
-                    }
-                },
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BottomSlot(ReferenceIcons.Back, "Go back", canBack, onBack, onBackLong)
-        BottomSlot(ReferenceIcons.Forward, "Go forward", canForward, onForward, onForwardLong)
-        if (searchToolbar) {
-            // The search toolbar replaces the home button with an inline
-            // search field, matching Via's compact bottom bar.
-            val searchInteraction = remember { MutableInteractionSource() }
-            Row(
-                Modifier
-                    .weight(2f)
-                    .fillMaxHeight()
-                    .padding(horizontal = 2.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(
-                        interactionSource = searchInteraction,
-                        indication = com.jump.browser.ui.theme.JumpPressIndication,
-                        onClick = onSearch,
-                    )
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    ReferenceIcons.Search,
-                    contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
+    // Platform-View bottom bar (ChromeViews.kt): five slots, 22dp glyphs,
+    // 18dp press feedback, drag-to-switch tabs when more than one is open.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    androidx.compose.runtime.key(searchToolbar) {
+        AndroidView(
+            modifier = modifier,
+            factory = { ctx ->
+                BottomBarView(
+                    ctx,
+                    ViewPalette.forChrome(dark),
+                    onBack = onBack,
+                    onForward = onForward,
+                    onHome = onHome,
+                    onTabs = onTabs,
+                    onNewTab = onNewTab,
+                    onMenu = onMenu,
+                    onMenuLong = onMenuLong,
+                    onBackLong = onBackLong,
+                    onForwardLong = onForwardLong,
+                    onHomeLong = onHomeLong,
+                    onSwitchTab = onSwitchTab,
+                    searchToolbar = searchToolbar,
+                    onSearch = onSearch,
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Search",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            },
+            update = {
+                it.bind(
+                    count = tabs.size,
+                    canBack = tab?.canGoBack == true,
+                    canForward = tab?.canGoForward == true,
+                    enabled = tabs.size > 1,
                 )
-            }
-        } else {
-            BottomSlot(ReferenceIcons.Home, "Home", true, onHome, onHomeLong)
-        }
-        val countInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(18.dp))
-                .combinedClickable(
-                    interactionSource = countInteraction,
-                    indication = com.jump.browser.ui.theme.JumpPressIndication,
-                    onClick = onTabs,
-                    onLongClick = onNewTab,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            TabCountBadge(
-                count = tabs.size,
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        BottomSlot(ReferenceIcons.Menu, "Menu", true, onMenu, onMenuLong)
+            },
+        )
     }
 }
 
