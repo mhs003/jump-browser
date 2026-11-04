@@ -23,6 +23,11 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.jump.browser.browser.TabInfo
 
+/** textIsSelectable needs API 11+ via the direct setter; kept as a shim. */
+fun setTextIsSelectable(view: android.widget.TextView, selectable: Boolean) {
+    view.setTextIsSelectable(selectable)
+}
+
 /**
  * The chrome on platform views: 48dp title bar, 48dp address bar, and the
  * five-slot bottom bar with drag-to-switch tabs. Same geometry, colors and
@@ -1655,4 +1660,159 @@ class ToolsDialogView(
             setOnClickListener { onDismissTools() }
         })
     }
+}
+
+/** View-source screen: 48dp library title row + monospace scroll. */
+class SourceScreenView(
+    context: Context,
+    palette: ViewPalette,
+    title: String,
+    private val onBack: () -> Unit,
+) : LinearLayout(context) {
+
+    private val body = TextView(context)
+
+    init {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(palette.background)
+        addView(context.libraryTitleRow(palette, title, onBack, actions = {
+            addView(FrameLayout(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 56f.cdp(context),
+                )
+                isClickable = true
+                isFocusable = true
+                pressFeedback()
+                setOnClickListener {
+                    val clipboard = context.getSystemService(
+                        android.content.Context.CLIPBOARD_SERVICE,
+                    ) as android.content.ClipboardManager
+                    @Suppress("DEPRECATION")
+                    clipboard.text = body.text.toString()
+                    JumpToast.show(context, "Source copied")
+                }
+                addView(lineIconView(context, "linecopy", palette.onSurface).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.WRAP_CONTENT,
+                        FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                    )
+                })
+            })
+        }))
+        addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1,
+            )
+            setBackgroundColor(palette.outlineVariant)
+        })
+        body.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+        body.setLineSpacing(0f, 16f / 11f)
+        body.typeface = android.graphics.Typeface.MONOSPACE
+        body.setTextColor(palette.onBackground)
+        body.setPadding(16f.cdp(context), 16f.cdp(context), 16f.cdp(context), 16f.cdp(context))
+        setTextIsSelectable(body, true)
+        addView(ScrollView(context).apply {
+            isVerticalScrollBarEnabled = false
+            addView(body, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            ))
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f,
+        ))
+    }
+
+    fun bind(source: String, title: String) {
+        body.text = source
+    }
+}
+
+/** Add/Edit bookmark dialog: two underline fields, Save/Cancel. */
+class BookmarkEditView(
+    context: Context,
+    private val palette: ViewPalette,
+    initialTitle: String,
+    initialUrl: String,
+    private val onSaved: (String, String) -> Unit,
+    private val onDismissDialog: () -> Unit,
+) : FrameLayout(context) {
+
+    private val titleField = EditText(context)
+    private val urlField = EditText(context)
+
+    init {
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = filledRound(16f.cdp(context), palette.surface)
+            setPadding(24f.cdp(context), 20f.cdp(context), 24f.cdp(context), 8f.cdp(context))
+            addView(TextView(context).apply {
+                text = if (initialTitle.isBlank() && initialUrl.isBlank()) "Add bookmark" else "Edit bookmark"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                setTextColor(palette.onBackground)
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = 16f.cdp(context) }
+            })
+            addView(field(initialTitle, "Title", uri = false, into = titleField))
+            addView(View(context), LinearLayout.LayoutParams(1, 16f.cdp(context)))
+            addView(field(initialUrl, "URL", uri = true, into = urlField))
+            addView(View(context), LinearLayout.LayoutParams(1, 6f.cdp(context)))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END
+                addView(dialogButton("Cancel", accent = false) { onDismissDialog() })
+                addView(dialogButton("Save", accent = true) {
+                    val t = titleField.text.toString().trim()
+                    val u = urlField.text.toString().trim()
+                    if (u.isNotBlank()) onSaved(t, u)
+                })
+            })
+        }
+        addView(card)
+    }
+
+    private fun field(initial: String, hint: String, uri: Boolean, into: EditText): LinearLayout {
+        val column = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
+        into.background = null
+        into.hint = hint
+        into.setHintTextColor(palette.onSurfaceVariant)
+        into.setTextColor(palette.onBackground)
+        into.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        into.setSingleLine(true)
+        if (uri) {
+            into.inputType = into.inputType or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val vpad = 8f.cdp(context)
+        into.setPadding(0, vpad, 0, vpad)
+        into.setText(initial)
+        column.addView(into, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
+        column.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1,
+            )
+            setBackgroundColor(0x30808080)
+        })
+        return column
+    }
+
+    private fun dialogButton(label: String, accent: Boolean, onClick: () -> Unit): TextView =
+        TextView(context).apply {
+            text = label
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(if (accent) palette.primary else palette.onSurfaceVariant)
+            gravity = Gravity.CENTER
+            minWidth = 56f.cdp(context)
+            minHeight = 48f.cdp(context)
+            setPadding(8f.cdp(context), 0, 8f.cdp(context), 0)
+            isClickable = true
+            pressFeedback(18f.cdp(context))
+            setOnClickListener { onClick() }
+        }
 }

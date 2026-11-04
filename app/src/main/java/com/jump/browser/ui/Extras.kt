@@ -93,31 +93,19 @@ fun ReaderContent(data: ReaderData, modifier: Modifier = Modifier) {
 
 @Composable
 fun SourceScreen(source: String, title: String, onBack: () -> Unit) {
+    // Platform-View page (ChromeViews.kt): title row, copy action, monospace
+    // selectable body.
     val context = androidx.compose.ui.platform.LocalContext.current
-    ScreenScaffold(
-        title = title,
-        onBack = onBack,
-        actions = {
-            ChromeButton(JumpIcons.Copy, "Copy source") {
-                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Source", source))
-            }
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    var host by remember { mutableStateOf<SourceScreenView?>(null) }
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { ctx ->
+            SourceScreenView(ctx, ViewPalette.forChrome(dark), title, onBack).also { host = it }
         },
-    ) {
-        SelectionContainer {
-            LazyColumn(Modifier.fillMaxSize()) {
-                item {
-                    Text(
-                        text = source,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
-        }
-    }
+        update = { it.bind(source, title) },
+    )
+    host?.tag = context to source
 }
 
 @Composable
@@ -148,7 +136,9 @@ fun FindBar(
             focusedOnce = true
         },
     )
-}@Composable
+}
+
+@Composable
 fun ErrorPage(
     message: String?,
     onRetry: () -> Unit,

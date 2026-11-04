@@ -1,5 +1,7 @@
 package com.jump.browser.ui
 
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.viewinterop.AndroidView
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Environment
@@ -149,34 +151,35 @@ fun BookmarkEditDialog(
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
 ) {
-    var title by remember(initial?.id) { mutableStateOf(initial?.title ?: "") }
-    var url by remember(initial?.id) { mutableStateOf(initial?.url ?: "") }
-    JumpAlertDialog(
+    // Platform-View card (ChromeViews.kt) inside the dialog window.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Add bookmark" else "Edit bookmark") },
-        text = {
-            Column {
-                JumpTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = "Title",
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        AndroidView(
+            modifier = Modifier
+                .padding(horizontal = 36.dp)
+                .fillMaxWidth(),
+            factory = { ctx ->
+                BookmarkEditView(
+                    ctx,
+                    ViewPalette.forChrome(dark),
+                    initial?.title.orEmpty(),
+                    initial?.url.orEmpty(),
+                    onSaved = { t, u ->
+                        onSave(t, u)
+                        onDismiss()
+                    },
+                    onDismissDialog = onDismiss,
                 )
-                Spacer(Modifier.height(16.dp))
-                JumpTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    placeholder = "URL",
-                    keyboardType = KeyboardType.Uri,
-                )
-            }
-        },
-        confirmButton = {
-            JumpDialogButton(onClick = { if (url.isNotBlank()) onSave(title, url) }) { Text("Save") }
-        },
-        dismissButton = { JumpDialogButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+            },
+            update = { },
+        )
+    }
 }
-
 private fun Set<Long>.toggle(id: Long): Set<Long> = if (id in this) this - id else this + id
 
 @Composable
