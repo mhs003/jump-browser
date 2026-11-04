@@ -208,7 +208,7 @@ opening the address overlay.
 Release builds enable R8 minification and resource shrinking. The signing
 config intentionally reuses the local debug key so the APK can be sideloaded
 for testing; replace it with a private release key before distribution. The
-minified build is approximately 2.2 MB including CameraX, ZXing and AndroidX
+minified build is approximately 1.3 MB including CameraX, ZXing and AndroidX
 WebKit.
 
 ## Testing

@@ -13,3 +13,6 @@ keystore.properties
 *.jks
 *.keystore
 build-logs/
+
+# Kotlin daemon session files
+.kotlin/

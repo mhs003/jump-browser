@@ -12,7 +12,7 @@ Guidance for coding agents working in the Jump repository.
 
 ## Commands
 
-Everything is built on-device with TAD inside Termux.
+Build, test and install through the `tad` wrapper:
 
 ```bash
 tad doctor               # verify the toolchain
@@ -21,13 +21,6 @@ tad build debug          # assemble and verify an APK
 tad install              # install the built APK
 tad test unit            # JVM tests
 tad test instrumented    # on-device Compose tests
-```
-
-After any on-device check, return to Termux:
-
-```bash
-adb -s 127.0.0.1:5555 shell am start \
-  -n com.termux/com.termux.app.TermuxActivity
 ```
 
 ## Conventions
@@ -92,5 +85,5 @@ app/src/main/java/com/jump/browser/
   key for sideloading: `tad build release`.
 - Keep `dist/Jump-<version>.apk` and `dist/SHA256SUMS.txt` in sync with the
   release build when producing a local artifact.
-- Screenshots live in `docs/screenshots/`; README references only files inside
-  this repository.
+- A small curated set of screenshots lives in `docs/screenshots/`; the README
+  references only files inside this repository.

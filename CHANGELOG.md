@@ -10,6 +10,14 @@ workflow refuses to publish otherwise.
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-11-04
+
+### Changed
+
+- Documentation pass: README tightened to a compact overview with a curated
+  four-screenshot section; environment-specific workflow notes moved out of
+  `AGENTS.md`; unused screenshot assets removed from the repository.
+
 ## [1.2.5] - 2026-11-04
 
 ### Fixed
